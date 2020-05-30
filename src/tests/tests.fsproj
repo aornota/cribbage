@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>netcoreapp3.1</TargetFramework>
+    	<LangVersion>preview</LangVersion>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    </PropertyGroup>
+    <ItemGroup> <!-- Compile -->
+        <Compile Include="..\common\console.fs" />
+        <Compile Include="..\common\debug-or-release.fs" />
+        <Compile Include="..\common\sourced-logger.fs" />
+        <Compile Include="..\domain\core.fs" />
+        <Compile Include="tests.fs" />
+        <Compile Include="program.fs" />
+    </ItemGroup>
+    <ItemGroup> <!-- appsettings.json -->
+        <Content Include="appsettings.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+    <Import Project="..\..\.paket\Paket.Restore.targets" />
+</Project>

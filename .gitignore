@@ -1,0 +1,7 @@
+.fake/
+.ionide/
+paket-files/
+bin/
+logs/
+obj/
+appsettings.development*.json

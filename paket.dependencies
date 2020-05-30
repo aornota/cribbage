@@ -1,0 +1,34 @@
+version 5.241.2
+
+group build
+
+    source https://api.nuget.org/v3/index.json
+    framework: netstandard2.0
+    storage: none
+
+    nuget FSharp.Core
+    nuget Fake.Core.Environment
+    nuget Fake.Core.Target
+    nuget Fake.Core.Trace
+    nuget Fake.DotNet.Cli
+    nuget Fake.IO.FileSystem
+
+group consoles
+
+    source https://api.nuget.org/v3/index.json
+    framework: netcoreapp3.1
+    storage: none
+
+	nuget FSharp.Core
+    nuget Giraffe.SerilogExtensions
+	nuget Serilog
+	nuget Serilog.Settings.Configuration
+	nuget Serilog.Sinks.Console
+
+group tests
+
+    source https://api.nuget.org/v3/index.json
+    framework: netcoreapp3.1
+    storage: none
+
+    nuget Expecto
