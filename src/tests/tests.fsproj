@@ -11,6 +11,7 @@
         <Compile Include="..\common\if-debug.fs" />
         <Compile Include="..\common\sourced-logger.fs" />
         <Compile Include="..\domain\core.fs" />
+        <Compile Include="..\domain\scoring.fs" />
         <Compile Include="tests.fs" />
         <Compile Include="program.fs" />
     </ItemGroup>
