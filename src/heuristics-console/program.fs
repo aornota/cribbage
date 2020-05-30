@@ -36,7 +36,7 @@ let private mainAsync argv = async {
 
     let mutable retval = 0
 
-    try let deck = shuffledDeck()
+    try let deck = shuffledDeck ()
         sourcedLogger.Debug("Shuffled deck: {deck}", deckText deck)
         let deck, dealt1 = dealToHand 6 (deck, Set.empty)
         let choice1 = randomChoice 2 dealt1
@@ -49,15 +49,15 @@ let private mainAsync argv = async {
         let cut = cut deck
         let nibsEvent = match NibsScoreEvent.Process cut with | Some event -> sprintf " -> %s" event.Text | None -> String.Empty
         sourcedLogger.Debug("Cut: {cut}{nibsEvent}", cardText cut, nibsEvent)
-        // TODO-NMB: Pegging...
+        // TODO-NMB: Pegging?...
         let hand1Events = HandScoreEvent.Process(hand1, cut)
-        sourcedLogger.Debug("Hand 1: {hand1} ({cut}) -> {score}", cardsText hand1, cardText cut, hand1Events |> List.sumBy (fun event -> event.Score))
+        sourcedLogger.Debug("Hand 1: {hand1} | {cut} -> {score}", cardsText hand1, cardText cut, hand1Events |> List.sumBy (fun event -> event.Score))
         hand1Events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))
         let hand2Events = HandScoreEvent.Process(hand2, cut)
-        sourcedLogger.Debug("Hand 2: {hand2} ({cut}) -> {score}", cardsText hand2, cardText cut, hand2Events |> List.sumBy (fun event -> event.Score))
+        sourcedLogger.Debug("Hand 2: {hand2} | {cut} -> {score}", cardsText hand2, cardText cut, hand2Events |> List.sumBy (fun event -> event.Score))
         hand2Events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))
         let cribEvents = CribScoreEvent.Process(crib, cut)
-        sourcedLogger.Debug("Crib: {crib} ({cut}) -> {score}", cardsText crib, cardText cut, cribEvents |> List.sumBy (fun event -> event.Score))
+        sourcedLogger.Debug("Crib: {crib} | {cut} -> {score}", cardsText crib, cardText cut, cribEvents |> List.sumBy (fun event -> event.Score))
         cribEvents |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))
     with | exn ->
         sourcedLogger.Error("Unexpected error:\n\t{errorMessage}", exn.Message)

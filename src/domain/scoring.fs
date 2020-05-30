@@ -12,22 +12,22 @@ type PeggingScoreEvent =
     | ThirtyOne
     | Go
     with
-    static member Play (events:PeggingScoreEvent list) (pegged:Card list) (card:Card option) : PeggingScoreEvent list * Card list =
+    static member Play (events:PeggingScoreEvent list) (pegged:Card list) (card:Card option) : PeggingScoreEvent list =
         match card, pegged with
         | None, [] -> failwith "Cannot play None when no Cards pegged"
-        | None, _ -> Go :: events, pegged
-        | Some card, [] -> events, [ card ]
+        | None, _ -> [ Go ]
+        | Some card, [] -> []
         | Some (rank, suit), _ ->
             let runningTotal = pips (pegged |> Set.ofList) + rank.PipValue
             if runningTotal > MAX_PEGGING then failwithf "Cannot play %s when running total is %i" (cardText (rank, suit)) (int runningTotal)
-            let newEvents = [
+            [
                 // TODO-NMB: Check for PeggingPair | ThreeOfAKind | FourOfAKind...
 
                 // TODO-NMB: Check for PeggingRun...
 
                 if runningTotal = 15<pip> then PeggingFifteen
-                else if runningTotal = MAX_PEGGING then ThirtyOne ]
-            newEvents @ events, (rank, suit) :: pegged
+                else if runningTotal = MAX_PEGGING then ThirtyOne
+            ]
     member this.Score =
         (match this with | PeggingPair _ | PeggingFifteen | ThirtyOne -> 2 | ThreeOfAKind _ -> 6 | FourOfAKind _ -> 12 | PeggingRun (r1, r2) -> (r1.Value - r2.Value) + 1 | Go -> 1) * 1<point>
     member this.Text =
@@ -52,8 +52,8 @@ type private CommonScoreEvent =
         if cards.Count <> 4 then failwithf "%s (%s) does not contain 4 Cards" (if isCrib then "Crib" else "Hand") (cardsText cards)
         else if cards.Contains cut then failwithf "%s (%s) must not contain cut Card (%s)" (if isCrib then "Crib" else "Hand") (cardsText cards) (cardText cut)
         let all = cut :: (cards |> List.ofSeq)
-        // TODO-NMB: Check for Fifteens | Pairs | Runs...
         [
+            // TODO-NMB: Check for Fifteens | Pairs | Runs...
 
             match all |> List.groupBy snd |> List.map fst with
             | [ _ ] -> FiveFlush (all |> Set.ofList)

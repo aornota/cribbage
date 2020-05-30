@@ -68,7 +68,10 @@ let shuffledDeck () : Deck = unshuffledDeck |> List.ofSeq |> List.zip (randoms u
 
 let dealToHand count (deck:Deck, hand:Hand) : Deck * Hand =
     if deck.Length < count then failwithf "Deck (%s) contains fewer than %i Card/s" (deckText deck) count
-    deck |> List.skip count, (deck |> List.take count) @ (hand |> List.ofSeq) |> Set.ofList
+    let dealt = deck |> List.take count |> Set.ofList
+    let alreadyInHand = dealt |> Set.intersect hand
+    if alreadyInHand.Count > 0 then failwithf "One or more dealt Cards (%s) are already in Hand (%s)" (cardsText alreadyInHand) (cardsText hand)
+    deck |> List.skip count, dealt |> Set.union hand
 
 let removeFromHand (hand:Hand, cards:Cards) : Hand =
     let notInHand = hand |> Set.difference cards
@@ -78,7 +81,9 @@ let removeFromHand (hand:Hand, cards:Cards) : Hand =
 let addToCrib (crib:Crib, cards:Cards) : Crib =
     if crib.Count <> 0 && crib.Count <> 2 then failwithf "Can only add to Crib (%s) when it contains 0 or 2 Cards (not %i)" (cardsText crib) crib.Count
     else if cards.Count <> 2 then failwithf "Can only add 2 Cards to Crib (not %i: %s)" cards.Count (cardsText cards)
-    ((cards |> List.ofSeq) @ (crib |> List.ofSeq)) |> Set.ofList
+    let alreadyInCrib = cards |> Set.intersect crib
+    if alreadyInCrib.Count > 0 then failwithf "One or more Cards (%s) are already in Crib (%s)" (cardsText alreadyInCrib) (cardsText crib)
+    cards |> Set.union crib
 
 let randomChoice count (cards:Cards) : Cards =
     if cards.Count < count then failwithf "Cards (%s) contains fewer than %i Card/s" (cardsText cards) count
