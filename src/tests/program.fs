@@ -1,7 +1,7 @@
 ﻿module Aornota.Cribbage.Tests.Program
 
 open Aornota.Cribbage.Common.Console
-open Aornota.Cribbage.Common.DebugOrRelease
+open Aornota.Cribbage.Common.IfDebug
 open Aornota.Cribbage.Common.SourcedLogger
 
 open Expecto
@@ -23,7 +23,7 @@ let private sourcedLogger = sourcedLogger SOURCE Log.Logger
 
 let private mainAsync argv = async {
     writeNewLine "Running " ConsoleColor.Magenta
-    write debugOrRelease ConsoleColor.DarkMagenta
+    write (ifDebug "Debug" "Release") ConsoleColor.DarkMagenta
     write (sprintf " %s.mainAsync" SOURCE) ConsoleColor.Magenta
     write (sprintf " %A" argv) ConsoleColor.DarkMagenta
     write "...\n" ConsoleColor.Magenta

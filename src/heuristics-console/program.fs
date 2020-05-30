@@ -1,8 +1,9 @@
 module Aornota.Cribbage.HeuristicsConsole.Program
 
 open Aornota.Cribbage.Common.Console
-open Aornota.Cribbage.Common.DebugOrRelease
+open Aornota.Cribbage.Common.IfDebug
 open Aornota.Cribbage.Common.SourcedLogger
+open Aornota.Cribbage.Domain.Core
 
 open Giraffe.SerilogExtensions
 open Microsoft.Extensions.Configuration
@@ -27,14 +28,15 @@ let private sourcedLogger = sourcedLogger SOURCE Log.Logger
 
 let private mainAsync argv = async {
     writeNewLine "Running " ConsoleColor.Green
-    write debugOrRelease ConsoleColor.DarkGreen
+    write (ifDebug "Debug" "Release") ConsoleColor.DarkGreen
     write (sprintf " %s.mainAsync" SOURCE) ConsoleColor.Green
     write (sprintf " %A" argv) ConsoleColor.DarkGreen
-    write "...\n" ConsoleColor.Green
+    write "...\n\n" ConsoleColor.Green
 
     let mutable retval = 0
 
-    try ()
+    try let deck = shuffledDeck() |> List.map (fun card -> card.Text) |> String.concat " "
+        sourcedLogger.Debug deck
     with | exn ->
         sourcedLogger.Error ("Unexpected error:\n\t{errorMessage}", exn.Message)
         retval <- 1

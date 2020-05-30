@@ -8,7 +8,7 @@
     </PropertyGroup>
     <ItemGroup> <!-- Compile -->
         <Compile Include="..\common\console.fs" />
-        <Compile Include="..\common\debug-or-release.fs" />
+        <Compile Include="..\common\if-debug.fs" />
         <Compile Include="..\common\sourced-logger.fs" />
         <Compile Include="..\domain\core.fs" />
         <Compile Include="tests.fs" />
