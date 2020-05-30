@@ -12,19 +12,38 @@ type PeggingScoreEvent =
     | ThirtyOne
     | Go
     with
-    static member Play (events:PeggingScoreEvent list) (pegged:Card list) (card:Card option) : PeggingScoreEvent list =
-        match card, pegged with
+    static member Play (current:Pegging) (card:Card option) : PeggingScoreEvent list =
+        match card, current with
         | None, [] -> failwith "Cannot play None when no Cards pegged"
         | None, _ -> [ Go ]
-        | Some card, [] -> []
-        | Some (rank, suit), _ ->
-            let runningTotal = pips (pegged |> Set.ofList) + rank.PipValue
-            if runningTotal > MAX_PEGGING then failwithf "Cannot play %s when running total is %i" (cardText (rank, suit)) (int runningTotal)
+        | Some _, [] -> []
+        | Some card, _ ->
+            let rank, _ = card
+            let runningTotal = pips (current |> Set.ofList) + rank.PipValue
+            if runningTotal > MAX_PEGGING then failwithf "Cannot play %s when running total is %i" (cardText card) (int runningTotal)
+            let rec findRun (cards:Card list) =
+                match cards.Length with
+                | n when n > 2 ->
+                    let ranks = cards |> List.map fst
+                    if ranks |> List.distinct |> List.length = n then
+                        let max, min = ranks |> List.max, ranks |> List.min
+                        if (max.Value - min.Value) + 1 = n then Some (max, min)
+                        else findRun (cards |> List.take (n - 1))
+                    else findRun (cards |> List.take (n - 1))
+                | _ -> None
             [
-                // TODO-NMB: Check for PeggingPair | ThreeOfAKind | FourOfAKind...
-
-                // TODO-NMB: Check for PeggingRun...
-
+                match current with
+                | h :: t when fst h = rank ->
+                    match t with
+                    | h :: t when fst h = rank ->
+                        match t with
+                        | h :: _ when fst h = rank -> FourOfAKind rank
+                        | _ -> ThreeOfAKind rank
+                    | _ -> PeggingPair rank
+                | _ -> ()
+                match findRun (card :: current) with
+                | Some (high, low) -> PeggingRun (high, low)
+                | None -> ()
                 if runningTotal = 15<pip> then PeggingFifteen
                 else if runningTotal = MAX_PEGGING then ThirtyOne
             ]

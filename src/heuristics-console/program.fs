@@ -59,6 +59,8 @@ let private mainAsync argv = async {
         let cribEvents = CribScoreEvent.Process(crib, cut)
         sourcedLogger.Debug("Crib: {crib} | {cut} -> {score}", cardsText crib, cardText cut, cribEvents |> List.sumBy (fun event -> event.Score))
         cribEvents |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))
+
+        //sourcedLogger.Debug("Normalized random: {random}", normalizedRandom ())
     with | exn ->
         sourcedLogger.Error("Unexpected error:\n\t{errorMessage}", exn.Message)
         retval <- 1

@@ -29,11 +29,11 @@ type Suit = | Spade | Heart | Diamond | Club
 type Card = Rank * Suit
 
 type Cards = Set<Card> // use Set to prevent duplicates
-
 type Hand = Cards
 type Crib = Cards
 
 type Deck = Card list // use list since ordering matters
+type Pegging = Card list
 
 let private unshuffledDeck : Cards =
     [ Spade ; Heart ; Diamond ; Club ]
@@ -55,6 +55,8 @@ let private randoms count =
 #endif
 
 let [<Literal>] MAX_PEGGING = 31<pip>
+
+let normalizedRandom () = abs (float (randoms 1 |> List.head) / float Int32.MaxValue)
 
 let pips (cards:Cards) = cards |> List.ofSeq |> List.sumBy (fun (rank, _) -> rank.PipValue)
 
