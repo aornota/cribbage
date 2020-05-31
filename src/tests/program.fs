@@ -30,8 +30,15 @@ let private mainAsync argv = async {
 
     let mutable retval = 0
 
-    try writeNewLine "todo:\n" ConsoleColor.DarkYellow
-        retval <- runTestsWithArgs defaultConfig argv Tests.todo
+    let updateRetval fRunTests =
+        let retval' = fRunTests ()
+        retval <- max retval retval'
+
+    try writeNewLine "domainCoreTests:\n" ConsoleColor.DarkYellow
+        updateRetval (fun _ -> runTestsWithArgs defaultConfig argv Tests.domainCoreTests)
+
+        writeNewLine "domainScoringTests:\n" ConsoleColor.DarkYellow
+        updateRetval (fun _ -> runTestsWithArgs defaultConfig argv Tests.domainScoringTests)
 
         if retval = 1 then
             writeBlankLine()

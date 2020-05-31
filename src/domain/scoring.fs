@@ -3,6 +3,12 @@ module Aornota.Cribbage.Domain.Scoring
 open Aornota.Cribbage.Common.Mathy
 open Aornota.Cribbage.Domain.Core
 
+exception CannotPlayNoneException of string
+exception CardAlreadyPlayedException of string
+exception CannotPlayCardException of string
+exception DoesNotContain4CardsException of string
+exception MustNotContainCutCardException of string
+
 let private isRun (cards:CardL) =
     match cards.Length with
     | len when len > 2 ->
@@ -15,7 +21,6 @@ let private isRun (cards:CardL) =
     | _ -> None
 
 type PeggingScoreEvent =
-    private
     | PeggingPair of Rank
     | ThreeOfAKind of Rank
     | FourOfAKind of Rank
@@ -24,15 +29,16 @@ type PeggingScoreEvent =
     | ThirtyOne
     | Go
     with
-    static member Play (current:CardL) (card:Card option) : PeggingScoreEvent list =
+    static member Play (current:CardL, card:Card option) : PeggingScoreEvent list =
         match card, current with
-        | None, [] -> failwith "Cannot play None when no Cards pegged"
+        | None, [] -> raise (CannotPlayNoneException "Cannot play None when no Cards pegged")
         | None, _ -> [ Go ]
         | Some _, [] -> []
         | Some card, _ ->
+            if current |> List.contains card then raise (CardAlreadyPlayedException (sprintf "%s has already been played" (cardText card)))
             let rank, _ = card
             let runningTotal = pips current + rank.PipValue
-            if runningTotal > MAX_PEGGING then failwithf "Cannot play %s when running total is %i" (cardText card) (int runningTotal)
+            if runningTotal > MAX_PEGGING then raise (CannotPlayCardException (sprintf "Cannot play %s when running total is %i" (cardText card) (int runningTotal)))
             let rec findRun (cards:CardL) =
                 match cards.Length with
                 | len when len > 3 ->
@@ -100,9 +106,9 @@ type private CommonScoreEvent =
     | FiveFlush of CardS
     | Nob of Card
     with
-    static member Process isCrib (cards:CardS, cut:Card) : CommonScoreEvent list =
-        if cards.Count <> 4 then failwithf "%s (%s) does not contain 4 Cards" (if isCrib then "Crib" else "Hand") (cardsText cards)
-        else if cards.Contains cut then failwithf "%s (%s) must not contain cut Card (%s)" (if isCrib then "Crib" else "Hand") (cardsText cards) (cardText cut)
+    static member Process (isCrib, cards:CardS, cut:Card) : CommonScoreEvent list =
+        if cards.Count <> 4 then raise (DoesNotContain4CardsException (sprintf "%s (%s) does not contain 4 Cards" (if isCrib then "Crib" else "Hand") (cardsText cards)))
+        else if cards.Contains cut then raise (MustNotContainCutCardException (sprintf "%s (%s) must not contain cut Card (%s)" (if isCrib then "Crib" else "Hand") (cardsText cards) (cardText cut)))
         let all = cut :: (cards |> List.ofSeq)
         let distinctRanks = all |> List.map fst |> List.distinct |> List.length
         [
@@ -136,7 +142,7 @@ and CribScoreEvent =
     private
     | CribScoreEvent of CommonScoreEvent
     with
-    static member Process (crib:Crib, cut:Card) : CribScoreEvent list = CommonScoreEvent.Process true (crib, cut) |> List.map CribScoreEvent
+    static member Process (crib:Crib, cut:Card) : CribScoreEvent list = CommonScoreEvent.Process (true, crib, cut) |> List.map CribScoreEvent
     member this.Score = match this with | CribScoreEvent event -> event.Score
     member this.Text = match this with | CribScoreEvent event -> event.Text
 
@@ -147,7 +153,7 @@ type HandScoreEvent =
     with
     static member Process (hand:Hand, cut:Card) : HandScoreEvent list =
         [
-            yield! CommonScoreEvent.Process false (hand, cut) |> List.map CommonScoreEvent
+            yield! CommonScoreEvent.Process (false, hand, cut) |> List.map CommonScoreEvent
             match hand |> List.ofSeq |> List.groupBy snd |> List.map fst with
             | [ suit ] when suit <> snd cut -> FourFlush hand
             | _ -> ()
