@@ -27,6 +27,6 @@ let rec combinations acc size set = seq {
     match size, set with
     | n, x :: xs ->
         if n > 0 then yield! combinations (x :: acc) (n - 1) xs
-        else if n >= 0 then yield! combinations acc n xs
+        if n >= 0 then yield! combinations acc n xs
     | 0, [] -> yield acc
     | _, [] -> () }

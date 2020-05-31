@@ -34,11 +34,19 @@ let private mainAsync argv = async {
         let retval' = fRunTests ()
         retval <- max retval retval'
 
-    try writeNewLine "domainCoreTests:\n" ConsoleColor.DarkYellow
-        updateRetval (fun _ -> runTestsWithArgs defaultConfig argv Tests.domainCoreTests)
+    try writeNewLine "commonMathyTests:\n" ConsoleColor.DarkYellow
+        updateRetval (fun _ -> runTestsWithCLIArgs [] [||] Tests.commonMathyTests)
+
+        writeNewLine "domainCoreTests:\n" ConsoleColor.DarkYellow
+        updateRetval (fun _ -> runTestsWithCLIArgs [] [||] Tests.domainCoreTests)
 
         writeNewLine "domainScoringTests:\n" ConsoleColor.DarkYellow
-        updateRetval (fun _ -> runTestsWithArgs defaultConfig argv Tests.domainScoringTests)
+        updateRetval (fun _ -> runTestsWithCLIArgs [] [||] Tests.domainScoringTests)
+
+        (* TEMP-NMB: These take ca. 5+ minutes for 100,000 iterations... *)
+        if retval = 0 then // only run if no failures above.
+            writeNewLine "domainScoringAdditionalTests:\n" ConsoleColor.DarkYellow
+            updateRetval (fun _ -> runTestsWithCLIArgs [] [||] Tests.domainScoringAdditionalTests)
 
         if retval = 1 then
             writeBlankLine()

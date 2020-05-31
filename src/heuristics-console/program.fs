@@ -49,7 +49,6 @@ let private mainAsync argv = async {
         let cut = cut deck
         let nibsEvent = match NibsScoreEvent.Process cut with | Some event -> sprintf " -> %s" event.Text | None -> String.Empty
         sourcedLogger.Debug("Cut: {cut}{nibsEvent}", cardText cut, nibsEvent)
-        // TODO-NMB: Pegging?...
         let hand1Events = HandScoreEvent.Process(hand1, cut)
         sourcedLogger.Debug("Hand 1: {hand1} | {cut} -> {score}", cardsText hand1, cardText cut, hand1Events |> List.sumBy (fun event -> event.Score))
         hand1Events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))

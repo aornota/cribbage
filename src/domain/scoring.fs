@@ -87,19 +87,21 @@ let rec private fifteens acc (cardsL:CardL list) =
             | _ -> fifteens acc (combinations [] (len  - 1) cards |> List.ofSeq))
     |> List.distinct
 
-let rec private runs acc (cardsL:CardL list) =
-    cardsL
-    |> List.collect (fun cards ->
-        match cards.Length with
-        | 0 | 1 | 2 -> acc
-        | len ->
-            match isRun cards with
-            | Some _ -> (cards |> Set.ofList) :: acc
-            | None -> runs acc (combinations [] (len  - 1) cards |> List.ofSeq))
-    |> List.distinct
+let private runs (cards:CardL) =
+    let rec runs acc (cardsL:CardL list) =
+        cardsL
+        |> List.collect (fun cards ->
+            match cards.Length with
+            | 0 | 1 | 2 -> acc
+            | len ->
+                match isRun cards with
+                | Some _ -> (cards |> Set.ofList) :: acc
+                | None -> runs acc (combinations [] (len  - 1) cards |> List.ofSeq))
+        |> List.distinct
+    let runs = runs [] [ cards ]
+    runs |> List.filter (fun cards -> not (runs |> List.exists (fun otherCards -> otherCards |> Set.isProperSubset cards)))
 
-type private CommonScoreEvent =
-    private
+type CommonScoreEvent =
     | Fifteen of CardS
     | Pair of CardS
     | Run of CardS
@@ -121,7 +123,7 @@ type private CommonScoreEvent =
                 |> List.collect (fun cards -> combinations [] 2 cards |> List.ofSeq)
                 |> List.map (Set.ofList >> Pair)
             if distinctRanks > 2 then
-                yield! runs [] [ all ] |> List.map Run
+                yield! runs all |> List.map Run
             if distinctRanks = 5 then
                 match all |> List.groupBy snd |> List.map fst with
                 | [ _ ] -> FiveFlush (all |> Set.ofList)
@@ -139,7 +141,6 @@ type private CommonScoreEvent =
         | FiveFlush cards -> sprintf "Flush (%s) for %i" (cardsText cards) this.Score
         | Nob card -> sprintf "%i for his nob (%s)" this.Score (cardText card)
 and CribScoreEvent =
-    private
     | CribScoreEvent of CommonScoreEvent
     with
     static member Process (crib:Crib, cut:Card) : CribScoreEvent list = CommonScoreEvent.Process (true, crib, cut) |> List.map CribScoreEvent
@@ -147,7 +148,6 @@ and CribScoreEvent =
     member this.Text = match this with | CribScoreEvent event -> event.Text
 
 type HandScoreEvent =
-    private
     | CommonScoreEvent of CommonScoreEvent
     | FourFlush of CardS
     with
@@ -162,7 +162,6 @@ type HandScoreEvent =
     member this.Text = match this with | CommonScoreEvent event -> event.Text | FourFlush cards -> sprintf "Flush (%s) for %i" (cardsText cards) (int this.Score)
 
 type NibsScoreEvent =
-    private
     | Nibs of Card
     with
     static member Process (cut:Card) : NibsScoreEvent option = if fst cut = Jack then Some (Nibs cut) else None
