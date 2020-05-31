@@ -1,10 +1,6 @@
 module Aornota.Cribbage.Domain.Core
 
-open System
-#if FABLE
-#else
-open System.Security.Cryptography
-#endif
+open Aornota.Cribbage.Common.Mathy
 
 type [<Measure>] pip // unit-of-measure for use in pegging
 type [<Measure>] point // unit-of-measure for use in scoring
@@ -28,43 +24,28 @@ type Suit = | Spade | Heart | Diamond | Club
 
 type Card = Rank * Suit
 
-type Cards = Set<Card> // use Set to prevent duplicates
-type Hand = Cards
-type Crib = Cards
+type CardS = Set<Card> // use Set to prevent duplicates
+type Hand = CardS
+type Crib = CardS
 
-type Deck = Card list // use list since ordering matters
-type Pegging = Card list
+type CardL = Card list // use list when ordering matters
+type Deck = CardL
+type Pegging = CardL
 
-let private unshuffledDeck : Cards =
+let private unshuffledDeck : CardS =
     [ Spade ; Heart ; Diamond ; Club ]
     |> List.collect (fun suit -> [ King ; Queen ; Jack ; Ten ; Nine ; Eight ; Seven ; Six ; Five ; Four ; Three ; Two ; Ace ] |> List.map (fun rank -> rank, suit))
     |> Set.ofList
 
-let private randoms count =
-#if FABLE
-    let rnd = Random()
-    [ for _ in 1..count do yield rnd.Next() ]
-#else
-    use rng = new RNGCryptoServiceProvider()
-    let bytes = Array.create 4 0uy
-    [
-        for _ in 1..count do
-            rng.GetBytes(bytes)
-            BitConverter.ToInt32(bytes, 0)
-    ]
-#endif
-
 let [<Literal>] MAX_PEGGING = 31<pip>
 
-let normalizedRandom () = abs (float (randoms 1 |> List.head) / float Int32.MaxValue)
-
-let pips (cards:Cards) = cards |> List.ofSeq |> List.sumBy (fun (rank, _) -> rank.PipValue)
+let pips (cards:CardL) = cards |> List.sumBy (fun (rank, _) -> rank.PipValue)
 
 let cardText (rank:Rank, suit:Suit) = sprintf "%c%c" rank.Text suit.Text
 
 let deckText (deck:Deck) = deck |> List.map cardText |> String.concat " "
 
-let cardsText (cards:Cards) = cards |> List.ofSeq |> List.sort|> List.map cardText |> String.concat " "
+let cardsText (cards:CardS) = cards |> List.ofSeq |> List.sort|> List.map cardText |> String.concat " "
 
 let shuffledDeck () : Deck = unshuffledDeck |> List.ofSeq |> List.zip (randoms unshuffledDeck.Count) |> List.sortBy fst |> List.map snd
 
@@ -75,19 +56,19 @@ let dealToHand count (deck:Deck, hand:Hand) : Deck * Hand =
     if alreadyInHand.Count > 0 then failwithf "One or more dealt Cards (%s) are already in Hand (%s)" (cardsText alreadyInHand) (cardsText hand)
     deck |> List.skip count, dealt |> Set.union hand
 
-let removeFromHand (hand:Hand, cards:Cards) : Hand =
+let removeFromHand (hand:Hand, cards:CardS) : Hand =
     let notInHand = hand |> Set.difference cards
     if notInHand.Count > 0 then failwithf "One or more Cards (%s) are not in Hand (%s)" (cardsText notInHand) (cardsText hand)
     cards |> Set.difference hand
 
-let addToCrib (crib:Crib, cards:Cards) : Crib =
+let addToCrib (crib:Crib, cards:CardS) : Crib =
     if crib.Count <> 0 && crib.Count <> 2 then failwithf "Can only add to Crib (%s) when it contains 0 or 2 Cards (not %i)" (cardsText crib) crib.Count
     else if cards.Count <> 2 then failwithf "Can only add 2 Cards to Crib (not %i: %s)" cards.Count (cardsText cards)
     let alreadyInCrib = cards |> Set.intersect crib
     if alreadyInCrib.Count > 0 then failwithf "One or more Cards (%s) are already in Crib (%s)" (cardsText alreadyInCrib) (cardsText crib)
     cards |> Set.union crib
 
-let randomChoice count (cards:Cards) : Cards =
+let randomChoice count (cards:CardS) : CardS =
     if cards.Count < count then failwithf "Cards (%s) contains fewer than %i Card/s" (cardsText cards) count
     else if cards.Count = count then cards
     else cards |> List.ofSeq |> List.zip (randoms cards.Count) |> List.sortBy fst |> List.map snd |> List.take count |> Set.ofList

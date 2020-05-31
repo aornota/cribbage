@@ -1,14 +1,15 @@
 module Aornota.Cribbage.Domain.Scoring
 
+open Aornota.Cribbage.Common.Mathy
 open Aornota.Cribbage.Domain.Core
 
-let private isRun (cards:Card list) =
+let private isRun (cards:CardL) =
     match cards.Length with
-    | n when n > 2 ->
+    | len when len > 2 ->
         let ranks = cards |> List.map fst
-        if ranks |> List.distinct |> List.length = n then
-            let max, min = ranks |> List.max, ranks |> List.min
-            if (max.Value - min.Value) + 1 = n then Some (max, min)
+        if ranks |> List.distinct |> List.length = len then
+            let max, min = ranks |> List.maxBy (fun rank -> rank.Value), ranks |> List.minBy (fun rank -> rank.Value)
+            if (max.Value - min.Value) + 1 = len then Some (max, min)
             else None
         else None
     | _ -> None
@@ -23,21 +24,21 @@ type PeggingScoreEvent =
     | ThirtyOne
     | Go
     with
-    static member Play (current:Pegging) (card:Card option) : PeggingScoreEvent list =
+    static member Play (current:CardL) (card:Card option) : PeggingScoreEvent list =
         match card, current with
         | None, [] -> failwith "Cannot play None when no Cards pegged"
         | None, _ -> [ Go ]
         | Some _, [] -> []
         | Some card, _ ->
             let rank, _ = card
-            let runningTotal = pips (current |> Set.ofList) + rank.PipValue
+            let runningTotal = pips current + rank.PipValue
             if runningTotal > MAX_PEGGING then failwithf "Cannot play %s when running total is %i" (cardText card) (int runningTotal)
-            let rec findRun (cards:Card list) =
+            let rec findRun (cards:CardL) =
                 match cards.Length with
-                | n when n > 3 ->
+                | len when len > 3 ->
                     match isRun cards with
                     | Some (high, low) -> Some (high, low)
-                    | None -> findRun (cards |> List.take (n - 1))
+                    | None -> findRun (cards |> List.take (len - 1))
                 | 3 -> isRun cards
                 | _ -> None
             [
@@ -68,27 +69,53 @@ type PeggingScoreEvent =
         | ThirtyOne -> sprintf "Thirty-one for %i" this.Score
         | Go -> sprintf "Go for %i" this.Score
 
+let rec private fifteens acc (cardsL:CardL list) =
+    cardsL
+    |> List.collect (fun cards ->
+        match cards.Length with
+        | 0 | 1 -> acc
+        | len ->
+            match pips cards with
+            | 15<pip> -> (cards |> Set.ofList) :: acc
+            | n when n < 15<pip> -> acc
+            | _ -> fifteens acc (combinations [] (len  - 1) cards |> List.ofSeq))
+    |> List.distinct
+
+let rec private runs acc (cardsL:CardL list) =
+    cardsL
+    |> List.collect (fun cards ->
+        match cards.Length with
+        | 0 | 1 | 2 -> acc
+        | len ->
+            match isRun cards with
+            | Some _ -> (cards |> Set.ofList) :: acc
+            | None -> runs acc (combinations [] (len  - 1) cards |> List.ofSeq))
+    |> List.distinct
+
 type private CommonScoreEvent =
     private
-    | Fifteen of Set<Card>
-    | Pair of Set<Card>
-    | Run of Set<Card>
-    | FiveFlush of Set<Card>
+    | Fifteen of CardS
+    | Pair of CardS
+    | Run of CardS
+    | FiveFlush of CardS
     | Nob of Card
     with
-    static member Process isCrib (cards:Cards, cut:Card) : CommonScoreEvent list =
+    static member Process isCrib (cards:CardS, cut:Card) : CommonScoreEvent list =
         if cards.Count <> 4 then failwithf "%s (%s) does not contain 4 Cards" (if isCrib then "Crib" else "Hand") (cardsText cards)
         else if cards.Contains cut then failwithf "%s (%s) must not contain cut Card (%s)" (if isCrib then "Crib" else "Hand") (cardsText cards) (cardText cut)
         let all = cut :: (cards |> List.ofSeq)
         let distinctRanks = all |> List.map fst |> List.distinct |> List.length
         [
-            // TODO-NMB: Fifteens...
+            yield! fifteens [] [ all ] |> List.map Fifteen
             if distinctRanks < 5 then
-                // TODO-NMB: Pairs...
-                ()
+                yield! all
+                |> List.groupBy fst
+                |> List.map snd
+                |> List.filter (fun cards -> cards.Length > 1)
+                |> List.collect (fun cards -> combinations [] 2 cards |> List.ofSeq)
+                |> List.map (Set.ofList >> Pair)
             if distinctRanks > 2 then
-                // TODO-NMB: Runs (remember isRun above)...
-                ()
+                yield! runs [] [ all ] |> List.map Run
             if distinctRanks = 5 then
                 match all |> List.groupBy snd |> List.map fst with
                 | [ _ ] -> FiveFlush (all |> Set.ofList)
@@ -116,7 +143,7 @@ and CribScoreEvent =
 type HandScoreEvent =
     private
     | CommonScoreEvent of CommonScoreEvent
-    | FourFlush of Set<Card>
+    | FourFlush of CardS
     with
     static member Process (hand:Hand, cut:Card) : HandScoreEvent list =
         [
