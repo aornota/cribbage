@@ -2,6 +2,7 @@ module Aornota.Cribbage.Domain.Core
 
 open Aornota.Cribbage.Common.Mathy
 
+type [<Measure>] game // unit-of-measure for use in meta-scoring
 type [<Measure>] pip // unit-of-measure for use in pegging
 type [<Measure>] point // unit-of-measure for use in scoring
 
@@ -79,6 +80,8 @@ let randomChoice count (cards:CardS) : CardS =
     if cards.Count < count then raise (InsufficientCardsException (sprintf "Cards (%s) contains fewer than %i Card/s" (cardsText cards) count))
     else if cards.Count = count then cards
     else cards |> List.ofSeq |> List.zip (randoms cards.Count) |> List.sortBy fst |> List.map snd |> List.take count |> Set.ofList
+
+let randomSingle (cards:CardS) : Card = randomChoice 1 cards |> Set.maxElement
 
 let deckExcept (cards:CardS) : CardS = cards |> Set.difference unshuffledDeck
 

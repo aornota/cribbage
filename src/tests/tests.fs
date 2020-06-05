@@ -15,7 +15,7 @@ let [<Tests>] commonMathyTests =
                 Expect.isLessThanOrEqual value 1.0 "normalizedRandom () should be less than or equal to 1.0"
                 Expect.isGreaterThanOrEqual value 0.0 "normalizedRandom () should be greater than or equal to 0.0" } ]
 
-let [<Tests>] domainCoreTests =
+let [<Tests>] domainCoreTests = // TODO-NMB: randomSingle? | deckExcept? | ...
     testList "Domain.Core tests" [
         test "pips should return correct value" {
             Expect.equal (pips [ sK ; dJ ; d8 ; hA ]) 29<pip> "pips did not return correct value" }
@@ -133,3 +133,5 @@ let [<Tests>] domainScoringAdditionalTests =
                 mustNotBe19Or25or26or27 cut hand1 false (handScore hand1Events)
                 mustNotBe19Or25or26or27 cut hand2 false (handScore hand2Events)
                 mustNotBe19Or25or26or27 cut crib true (cribScore cribEvents) } ]
+
+// TODO-NMB: strategyTests? | ...
