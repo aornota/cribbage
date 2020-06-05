@@ -80,4 +80,6 @@ let randomChoice count (cards:CardS) : CardS =
     else if cards.Count = count then cards
     else cards |> List.ofSeq |> List.zip (randoms cards.Count) |> List.sortBy fst |> List.map snd |> List.take count |> Set.ofList
 
+let deckExcept (cards:CardS) : CardS = cards |> Set.difference unshuffledDeck
+
 let cut (deck:Deck) : Card = randomChoice 1 (deck |> Set.ofList) |> List.ofSeq |> List.head

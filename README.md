@@ -26,6 +26,6 @@ Before first run:
 
 Build targets:
 
-- Run the heuristics console (Debug): _fake build -t run-heuristics-console_ (or just _fake build_)
+- Run the dev console (Debug): _fake build -t run-dev-console_ (or just _fake build_)
 - Run the tests (Release): _fake build --t run-tests_
 - Help (lists key targets): _fake build -t help_

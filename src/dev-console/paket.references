@@ -1,6 +1,7 @@
 group consoles
 
 	FSharp.Core
+    FSharp.Data.Adaptive
     Giraffe.SerilogExtensions
 	Serilog
     Serilog.Settings.Configuration

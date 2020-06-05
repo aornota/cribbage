@@ -20,6 +20,8 @@ group consoles
     storage: none
 
 	nuget FSharp.Core
+    nuget FSharp.Data.Adaptive ~> 0.0.25
+    nuget Adaptify.MSBuild ~> 0.0.48
     nuget Giraffe.SerilogExtensions
 	nuget Serilog
 	nuget Serilog.Settings.Configuration

@@ -14,7 +14,7 @@ open Fake.Core.TargetOperators
 open Fake.DotNet
 open Fake.IO
 
-let private heuristicsConsoleDir = Path.getFullName "./src/heuristics-console"
+let private devConsoleDir = Path.getFullName "./src/dev-console"
 
 let private testsDir = Path.getFullName "./src/tests"
 
@@ -28,18 +28,18 @@ let private createMissingAppSettingsForDevelopment dir =
         Shell.copyFile requiredSettings (Path.combine dir productionSettings)
         Trace.traceImportant (sprintf "WARNING -> %s did not exist and has been copied from %s; it will most likely need to be modified" requiredSettings productionSettings)
 
-Target.create "run-heuristics-console" (fun _ ->
-    createMissingAppSettingsForDevelopment heuristicsConsoleDir
-    runDotNet "run" heuristicsConsoleDir)
+Target.create "run-dev-console" (fun _ ->
+    createMissingAppSettingsForDevelopment devConsoleDir
+    runDotNet "run" devConsoleDir)
 
 Target.create "run-tests" (fun _ -> runDotNet "run -c Release" testsDir)
 
 Target.create "help" (fun _ ->
     printfn "\nThese useful build targets can be run via 'fake build -t {target}':"
-    printfn "\n\trun-heuristics-console -> builds and runs [Debug] heuristics-console"
+    printfn "\n\trun-dev-console -> builds and runs [Debug] dev-console"
     printfn "\n\trun-tests -> builds and runs [Release] tests"
     printfn "\n\thelp -> shows this list of build targets\n")
 
-// TODO-NMB: Reinstante?..."run-tests" ==> "run-heuristics-console"
+// TODO-NMB: Reinstante?..."run-tests" ==> "run-dev-console"
 
-Target.runOrDefaultWithArguments "run-heuristics-console"
+Target.runOrDefaultWithArguments "run-dev-console"
