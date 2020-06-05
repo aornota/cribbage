@@ -40,6 +40,6 @@ Target.create "help" (fun _ ->
     printfn "\n\trun-tests -> builds and runs [Release] tests"
     printfn "\n\thelp -> shows this list of build targets\n")
 
-// TODO-NMB: Reinstante?..."run-tests" ==> "run-dev-console"
+// TODO-NMB: Reinstate?..."run-tests" ==> "run-dev-console"
 
 Target.runOrDefaultWithArguments "run-dev-console"

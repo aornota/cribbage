@@ -36,8 +36,10 @@ let private mainAsync argv = async {
 
     let mutable retval = 0
 
-    try do! GamePlayer.play (Computer ("Basic", forCribBasic, pegRandom)) (Computer ("Random", forCribRandom, pegRandom)) 3uy
-        // TEMP-NMB... Scratchpad.workInProgress ()
+    try do! GamePlayer.play (Computer (PlayerId.Create(), "Basic", forCribBasic, pegRandom)) (Computer (PlayerId.Create(), "Random", forCribRandom, pegRandom)) 3uy
+
+        (* TEMP-NMB...
+        Scratchpad.workInProgress () *)
     with | exn ->
         sourcedLogger.Error("Unexpected error:\n\t{errorMessage}", exn.Message)
         retval <- 1
