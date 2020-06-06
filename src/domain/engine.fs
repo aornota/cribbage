@@ -385,10 +385,12 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
             awaitingNewDeal.Value <- newAwaitingNewDeal)
     let processGame deal1 deal2 =
         let dealSummary = { Player1DealSummary = deal1 ; Player2DealSummary = deal2 }
-        let gameSummary = GameSummary.FromDealSummaries(dealSummary :: dealSummaries.Value)
-        sourcedLogger.Debug("...game finished -> {name1} {score1} - {score2} {name2}", player1.Name, gameSummary.Player1Score, gameSummary.Player2Score, player2.Name)
-        sourcedLogger.Debug("...{name} wins the game", (toPlayer gameSummary.Winner).Name)
+        let newDealSummaries = dealSummary :: dealSummaries.Value
+        let gameSummary = GameSummary.FromDealSummaries(newDealSummaries)
         let newGameSummaries = gameSummary :: gameSummaries.Value
+        let games1, games2 = newGameSummaries |> List.sumBy (fun summary -> summary.Player1Game), newGameSummaries |> List.sumBy (fun summary -> summary.Player2Game)
+        sourcedLogger.Debug("...game finished -> {name1} ({games1}) {score1} - {score2} ({games2}) {name2}", player1.Name, games1, gameSummary.Player1Score, gameSummary.Player2Score, games2, player2.Name)
+        sourcedLogger.Debug("...{name} wins the game (in {deals} deal/s)", (toPlayer gameSummary.Winner).Name, newDealSummaries.Length)
         let newAwaitingNewGame = [
             if player1.IsInteractive then Player1
             if player2.IsInteractive then Player2 ]

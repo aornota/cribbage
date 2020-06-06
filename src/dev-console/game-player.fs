@@ -29,7 +29,7 @@ let computerVsComputer games =
             // TODO-NMB: Output statistics, e.g. average pegging | hand | crib scores (when dealer | non-dealer) for each player?...
             let quitter = if games1 > games2 then Player2 else Player1
             engine.Quit(quitter)
-    let scoresCallback (score1, score2) = sourcedLogger.Information("...{name1} {score1} - {score2} {name2}", name1, score1, score2, name2)
+    let scoresCallback (score1, score2) = if score1 + score2 > 0<point> then sourcedLogger.Debug("...{name1} {score1} - {score2} {name2}", name1, score1, score2, name2)
     use gamesCallback = engine.Games.AddCallback gamesCallback
     use scoresCallback = engine.Scores.AddCallback scoresCallback
     engine.Start()
