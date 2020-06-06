@@ -32,6 +32,7 @@ exception InvalidInteractionException of string
 let [<Literal>] private SOURCE = "Domain.Engine"
 
 let [<Literal>] private GAME_TARGET = 121<point>
+let [<Literal>] private DEALT_HAND_COUNT = 6
 
 type private SourcedLogger () =
 #if FABLE
@@ -192,8 +193,8 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
         let! awaitingNewDeal = awaitingNewDeal
         let! awaitingNewGame = awaitingNewGame
         let awaitingForCrib = [
-            if player1.IsInteractive && hand1.Count = 6 then Player1
-            if player2.IsInteractive && hand2.Count = 6 then Player2 ]
+            if player1.IsInteractive && hand1.Count = DEALT_HAND_COUNT then Player1
+            if player2.IsInteractive && hand2.Count = DEALT_HAND_COUNT then Player2 ]
         if awaitingForCrib.Length > 0 then return Some (AwaitingForCrib awaitingForCrib)
         else if false then return None // TODO-NMB: AwaitingPeg | AwaitingCannotPeg | ...
         else if awaitingNewDeal.Length > 0 then return Some (AwaitingNewDeal awaitingNewDeal)
@@ -222,8 +223,8 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
                 | None -> return NewDeal
                 | Some (deal1, deal2) ->
                     if fst scores < GAME_TARGET && snd scores < GAME_TARGET then
-                        if hand1.Count = 6 && not player1.IsInteractive then return ForCrib1
-                        else if hand2.Count = 6 && not player2.IsInteractive then return ForCrib2
+                        if hand1.Count = DEALT_HAND_COUNT && not player1.IsInteractive then return ForCrib1
+                        else if hand2.Count = DEALT_HAND_COUNT && not player2.IsInteractive then return ForCrib2
                         else if cutCard |> Option.isNone then return Cut
                         else if peg1.Count > 0 && peg2.Count > 0 then return Pegging
                         // TODO-NMB: More pegging?...
@@ -236,15 +237,15 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
     let toHand = function | Player1 -> hand1 | Player2 -> hand2
     let isDealer player = match currentDealer.Value with | Some dealer -> dealer = player | None -> raise NoCurrentDealerException
     let dealer () = if isDealer Player1 then Player1 else Player2
-    let failIfNot6Cards (hand:Hand) = if hand.Count <> 6 then raise HandDoesNotContain6CardsException
+    let failIfNotDealtHand (hand:Hand) = if hand.Count <> DEALT_HAND_COUNT then raise HandDoesNotContain6CardsException
     let newDeal () =
         if currentDeal.Value |> Option.isSome then raise DealNotFinishedException
         let newCurrentDealer = match currentDealer.Value with | Some Player1 -> Player2 | Some Player2 -> Player1 | None -> firstDealer.Value
         let isDealer1, isDealer2 = newCurrentDealer = Player1, newCurrentDealer = Player2
         sourcedLogger.Debug("Dealing hands ({name} is dealer)...", (toPlayer newCurrentDealer).Name)
         let newDeck = shuffledDeck ()
-        let newDeck, dealt1 = dealToHand 6 (newDeck, Set.empty)
-        let newDeck, dealt2 = dealToHand 6 (newDeck, Set.empty)
+        let newDeck, dealt1 = dealToHand DEALT_HAND_COUNT (newDeck, Set.empty)
+        let newDeck, dealt2 = dealToHand DEALT_HAND_COUNT (newDeck, Set.empty)
         sourcedLogger.Debug("...dealt to {name1} -> {dealt1}", player1.Name, cardsText dealt1)
         sourcedLogger.Debug("...dealt to {name2} -> {dealt2}", player2.Name, cardsText dealt2)
         transact (fun _ ->
@@ -266,7 +267,7 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
             awaitingNewGame.Value <- [])
     let handToCrib player forCrib =
         let hand = toHand player
-        failIfNot6Cards hand.Value
+        failIfNotDealtHand hand.Value
         let newHand, newCrib = removeFromHand (hand.Value, forCrib), addToCrib (crib.Value, forCrib)
         sourcedLogger.Debug("...{name} adds {forCrib} to crib -> hand is {newHand}", (toPlayer player).Name, cardsText forCrib, cardsText newHand)
         transact (fun _ ->
@@ -277,7 +278,7 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
         | Human _ -> raise (UnexpectedForCribForHumanPlayerException player)
         | Computer (name, forCribStrategy, _) ->
             let hand = toHand player
-            failIfNot6Cards hand.Value
+            failIfNotDealtHand hand.Value
             sourcedLogger.Debug("Choosing cards for crib from {name}...", name)
             handToCrib player (forCribStrategy (isDealer player, hand.Value))
     let cut () =
@@ -477,6 +478,12 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
         match awaitingInteraction with
         | Some (AwaitingForCrib players) when players |> List.contains player -> return Some (hand, fun forCrib -> interact (ForCrib (player, forCrib)))
         | _ -> return None }
+    member _.AwaitingCrib1 = adaptive {
+        let! hand1 = hand1
+        return hand1.Count = DEALT_HAND_COUNT }
+    member _.AwaitingCrib2 = adaptive {
+        let! hand2 = hand2
+        return hand2.Count = DEALT_HAND_COUNT }
     member _.CutCard = cutCard
     member _.NibsEvent = nibsEvent
     // TODO-NMB: AwaitingPeg (return (Peggable * function) option?) | AwaitingCannotPeg | ...
