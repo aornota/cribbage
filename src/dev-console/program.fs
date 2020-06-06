@@ -3,8 +3,6 @@ module Aornota.Cribbage.DevConsole.Program
 open Aornota.Cribbage.Common.Console
 open Aornota.Cribbage.Common.IfDebug
 open Aornota.Cribbage.Common.SourcedLogger
-open Aornota.Cribbage.Domain.State
-open Aornota.Cribbage.Domain.Strategy
 
 open Giraffe.SerilogExtensions
 open Microsoft.Extensions.Configuration
@@ -36,7 +34,7 @@ let private mainAsync argv = async {
 
     let mutable retval = 0
 
-    try do! GamePlayer.play (Computer (PlayerId.Create(), "Basic", forCribBasic, pegRandom)) (Computer (PlayerId.Create(), "Random", forCribRandom, pegRandom)) 3uy
+    try do! GamePlayer.computerVsComputer 3
 
         (* TEMP-NMB...
         Scratchpad.workInProgress () *)

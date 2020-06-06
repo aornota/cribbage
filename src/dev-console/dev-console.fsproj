@@ -13,8 +13,8 @@
         <Compile Include="..\common\sourced-logger.fs" />
         <Compile Include="..\domain\core.fs" />
         <Compile Include="..\domain\scoring.fs" />
-        <Compile Include="..\domain\state.fs" />
         <Compile Include="..\domain\strategy.fs" />
+        <Compile Include="..\domain\engine.fs" />
         <Compile Include="game-player.fs" />
         <Compile Include="scratchpad.fs" />
         <Compile Include="program.fs" />

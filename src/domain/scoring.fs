@@ -9,6 +9,8 @@ exception CannotPlayCardException of string
 exception DoesNotContain4CardsException of string
 exception MustNotContainCutCardException of string
 
+type Pegged = CardL
+
 let private isRun (cards:CardL) =
     match cards.Length with
     | len when len > 2 ->
@@ -29,15 +31,15 @@ type PeggingScoreEvent =
     | ThirtyOne
     | Go
     with
-    static member Play (current:CardL, card:Card option) : PeggingScoreEvent list =
-        match card, current with
+    static member Play (pegged:Pegged, card:Card option) : PeggingScoreEvent list =
+        match card, pegged with
         | None, [] -> raise (CannotPlayNoneException "Cannot play None when no Cards pegged")
         | None, _ -> [ Go ]
         | Some _, [] -> []
         | Some card, _ ->
-            if current |> List.contains card then raise (CardAlreadyPlayedException (sprintf "%s has already been played" (cardText card)))
+            if pegged |> List.contains card then raise (CardAlreadyPlayedException (sprintf "%s has already been played" (cardText card)))
             let rank, _ = card
-            let runningTotal = pips current + rank.PipValue
+            let runningTotal = pips pegged + rank.PipValue
             if runningTotal > MAX_PEGGING then raise (CannotPlayCardException (sprintf "Cannot play %s when running total is %i" (cardText card) (int runningTotal)))
             let rec findRun (cards:CardL) =
                 match cards.Length with
@@ -48,7 +50,7 @@ type PeggingScoreEvent =
                 | 3 -> isRun cards
                 | _ -> None
             [
-                match current with
+                match pegged with
                 | h :: t when fst h = rank ->
                     match t with
                     | h :: t when fst h = rank ->
@@ -57,7 +59,7 @@ type PeggingScoreEvent =
                         | _ -> ThreeOfAKind rank
                     | _ -> PeggingPair rank
                 | _ ->
-                    match findRun (card :: current) with
+                    match findRun (card :: pegged) with
                     | Some (high, low) -> PeggingRun (high, low)
                     | None -> ()
                 if runningTotal = 15<pip> then PeggingFifteen

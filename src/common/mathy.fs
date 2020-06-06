@@ -6,6 +6,20 @@ open System
 open System.Security.Cryptography
 #endif
 
+exception MeanCountMustBeGreaterThanZeroException of int
+
+type Mean<[<Measure>] 'u> = {
+    Total : int<'u>
+    Count : int }
+    with
+    static member Create(total, count) =
+        if count <= 0 then raise (MeanCountMustBeGreaterThanZeroException count)
+        { Total = total ; Count = count }
+    static member FromList(list) = Mean<_>.Create(list |> List.sum, list.Length)
+    static member Combine(mean1, mean2) = { Total = mean1.Total + mean2.Total ; Count = mean1.Count + mean2.Count }
+    static member Update(mean, value) = { Total = mean.Total + value ; Count = mean.Count + 1 }
+    member this.Mean : float<'u> = LanguagePrimitives.FloatWithMeasure (float this.Total / float this.Count)
+
 let randoms count =
 #if FABLE
     let rnd = Random()
