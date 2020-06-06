@@ -133,7 +133,8 @@ type private State =
     | ForCrib1
     | ForCrib2
     | Cut
-    | ToDo // TODO-NMB: Pegging...
+    | Pegging
+    // TODO-NMB: More pegging?...
     | ScoreNonDealerHand
     | ScoreDealerHand
     | ScoreCrib
@@ -162,7 +163,9 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
     let crib : cval<Crib> = cval Set.empty
     let cutCard : cval<Card option> = cval None
     let nibsEvent : cval<(Player * NibsScoreEvent) option> = cval None
-    // TODO-NMB: Pegging...
+    let peg1 : cval<Hand> = cval Set.empty
+    let peg2 : cval<Hand> = cval Set.empty
+    // TODO-NMB: More pegging?...
     let nonDealerHandEvents : cval<(Player * Hand * HandScoreEvent list) option> = cval None
     let dealerHandEvents : cval<(Player * Hand * HandScoreEvent list) option> = cval None
     let cribEvents : cval<(Player * Crib * CribScoreEvent list) option> = cval None
@@ -174,7 +177,13 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
         return gameSummaries |> List.sumBy (fun summary -> summary.Player1Game), gameSummaries |> List.sumBy (fun summary -> summary.Player2Game) }
     let scores = adaptive {
         let! dealSummaries = dealSummaries
-        return dealSummaries |> List.sumBy (fun summary -> summary.Player1Score), dealSummaries |> List.sumBy (fun summary -> summary.Player2Score) }
+        let! currentDeal = currentDeal
+        let score1, score2 = dealSummaries |> List.sumBy (fun summary -> summary.Player1Score), dealSummaries |> List.sumBy (fun summary -> summary.Player2Score)
+        let score1, score2 =
+            match currentDeal with
+            | Some (deal1, deal2) -> score1 + deal1.Score, score2 + deal2.Score
+            | None -> score1, score2
+        return score1, score2 }
     let awaitingInteraction = adaptive {
         // TODO-NMB: Make dependencies dynamic (e.g. only "bind" to awaitingNewDeal &c. if not yet awaiting something else)?...
         let! hand1 = hand1
@@ -195,10 +204,12 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
         let! quitter = quitter
         let! awaitingInteraction = awaitingInteraction
         let! currentDeal = currentDeal
+        let! scores = scores
         let! hand1 = hand1
         let! hand2 = hand2
         let! cutCard = cutCard
-        // TODO-NMB: Pegging-related...
+        let! peg1 = peg1
+        let! peg2 = peg2
         let! nonDealerHandEvents = nonDealerHandEvents
         let! dealerHandEvents = dealerHandEvents
         let! cribEvents = cribEvents
@@ -210,13 +221,12 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
                 match currentDeal with
                 | None -> return NewDeal
                 | Some (deal1, deal2) ->
-                    let score1 = (dealSummaries.Value |> List.sumBy (fun summary -> summary.Player1Score)) + deal1.Score
-                    let score2 = (dealSummaries.Value |> List.sumBy (fun summary -> summary.Player2Score)) + deal2.Score
-                    if score1 < GAME_TARGET && score2 < GAME_TARGET then
+                    if fst scores < GAME_TARGET && snd scores < GAME_TARGET then
                         if hand1.Count = 6 && not player1.IsInteractive then return ForCrib1
                         else if hand2.Count = 6 && not player2.IsInteractive then return ForCrib2
                         else if cutCard |> Option.isNone then return Cut
-                        else if false then return ToDo // TODO-NMB: Pegging...
+                        else if peg1.Count > 0 && peg2.Count > 0 then return Pegging
+                        // TODO-NMB: More pegging?...
                         else if nonDealerHandEvents |> Option.isNone then return ScoreNonDealerHand
                         else if dealerHandEvents |> Option.isNone then return ScoreDealerHand
                         else if cribEvents |> Option.isNone then return ScoreCrib
@@ -246,7 +256,9 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
             crib.Value <- Set.empty
             cutCard.Value <- None
             nibsEvent.Value <- None
-            // TODO-NMB: More(?)...
+            peg1.Value <- Set.empty
+            peg2.Value <- Set.empty
+            // TODO-NMB: More pegging?...
             nonDealerHandEvents.Value <- None
             dealerHandEvents.Value <- None
             cribEvents.Value <- None
@@ -286,9 +298,25 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
             match newCurrentDeal with | Some newCurrentDeal -> currentDeal.Value <- Some newCurrentDeal | None -> ()
             deck.Value <- newDeck
             cutCard.Value <- Some newCutCard
-            match newNibsEvent with | Some newNibsEvent -> nibsEvent.Value <- Some newNibsEvent | None -> ())
+            match newNibsEvent with | Some newNibsEvent -> nibsEvent.Value <- Some newNibsEvent | None -> ()
+            peg1.Value <- hand1.Value
+            peg2.Value <- hand2.Value)
 
-    // TODO-NMB: Pegging (remember to reset nibsEvent) | ...
+    let pegging () = // TEMP-NMB...
+        // TODO-NMB: Implement properly...
+        let newCurrentDeal =
+            match currentDeal.Value with
+            | None -> raise NoCurrentDealException
+            | Some (deal1, deal2) ->
+                let deal1 = { deal1 with PeggingScore = Some (0<point>, true) }
+                let deal2 = { deal2 with PeggingScore = Some (0<point>, true) }
+                Some (deal1, deal2)
+        transact (fun _ ->
+            match newCurrentDeal with | Some newCurrentDeal -> currentDeal.Value <- Some newCurrentDeal | None -> ()
+            nibsEvent.Value <- None // TODO-NMB: Only reset once first card pegged...
+            peg1.Value <- Set.empty
+            peg2.Value <- Set.empty)
+    // TODO-NMB: More pegging (remember to reset nibsEvent)?...
 
     let scoreNonDealerHand () =
         if nonDealerHandEvents.Value |> Option.isSome then raise AlreadyScoredException
@@ -402,9 +430,10 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
         | Cut ->
             cut ()
             engine ()
-        | ToDo ->
-            // TODO-NMB: Pegging...
-            () // TEMP-NMB...
+        | Pegging ->
+            pegging ()
+            engine ()
+        // TODO-NMB: More pegging?...
         | ScoreNonDealerHand ->
             scoreNonDealerHand ()
             engine ()
@@ -449,7 +478,9 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
     member _.CutCard = cutCard
     member _.NibsEvent = nibsEvent
     // TODO-NMB: AwaitingPeg (return (Peggable * function) option?) | AwaitingCannotPeg | ...
-    // TODO-NMB: HandsEvents (with Hand/s) | CribEvents (with Crib) | ...
+    member _.NonDealerHandEvents = nonDealerHandEvents
+    member _.DealerHandEvents = dealerHandEvents
+    member _.CribEvents = cribEvents
     member _.AwaitingNewDeal(player) = adaptive {
         let! awaitingInteraction = awaitingInteraction
         match awaitingInteraction with

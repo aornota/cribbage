@@ -34,7 +34,7 @@ let private mainAsync argv = async {
 
     let mutable retval = 0
 
-    try do! GamePlayer.computerVsComputer 3
+    try GamePlayer.computerVsComputer 1
 
         (* TEMP-NMB...
         Scratchpad.workInProgress () *)
