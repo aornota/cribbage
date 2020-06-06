@@ -321,19 +321,20 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
 
     let scoreNonDealerHand () =
         if nonDealerHandEvents.Value |> Option.isSome then raise AlreadyScoredException
-        let dealer = dealer ()
+        let nonDealer = if dealer () = Player1 then Player2 else Player1
         let newCurrentDeal, newNonDealerHandEvents =
             match currentDeal.Value, cutCard.Value with
             | None, _ -> raise NoCurrentDealException
             | _, None -> raise NotCutException
             | Some (deal1, deal2), Some cutCard ->
-                let hand = if dealer = Player1 then hand2.Value else hand1.Value
+                let hand = if nonDealer = Player1 then hand1.Value else hand2.Value
                 let events = HandScoreEvent.Process(hand, cutCard)
                 let score = events |> List.sumBy (fun event -> event.Score)
-                // TODO-NMB: Debug...
-                let deal1 = if dealer = Player2 then { deal1 with HandScore = Some score } else deal1
-                let deal2 = if dealer = Player1 then { deal2 with HandScore = Some score } else deal2
-                Some (deal1, deal2), Some (dealer, hand, events)
+                sourcedLogger.Debug("Hand: {hand} | {cutCard} -> {name} scores {score}", cardsText hand, cardText cutCard, (toPlayer nonDealer).Name, score)
+                events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))
+                let deal1 = if nonDealer = Player1 then { deal1 with HandScore = Some score } else deal1
+                let deal2 = if nonDealer = Player2 then { deal2 with HandScore = Some score } else deal2
+                Some (deal1, deal2), Some (nonDealer, hand, events)
         transact (fun _ ->
             match newCurrentDeal with | Some newCurrentDeal -> currentDeal.Value <- Some newCurrentDeal | None -> ()
             match newNonDealerHandEvents with | Some newNonDealerHandEvents -> nonDealerHandEvents.Value <- Some newNonDealerHandEvents | None -> ())
@@ -348,7 +349,8 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
                 let hand = if dealer = Player1 then hand1.Value else hand2.Value
                 let events = HandScoreEvent.Process(hand, cutCard)
                 let score = events |> List.sumBy (fun event -> event.Score)
-                // TODO-NMB: Debug...
+                sourcedLogger.Debug("Hand: {hand} | {cutCard} -> {name} scores {score}", cardsText hand, cardText cutCard, (toPlayer dealer).Name, score)
+                events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))
                 let deal1 = if dealer = Player1 then { deal1 with HandScore = Some score } else deal1
                 let deal2 = if dealer = Player2 then { deal2 with HandScore = Some score } else deal2
                 Some (deal1, deal2), Some (dealer, hand, events)
@@ -366,7 +368,8 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
                 let crib = crib.Value
                 let events = CribScoreEvent.Process(crib, cutCard)
                 let score = events |> List.sumBy (fun event -> event.Score)
-                // TODO-NMB: Debug...
+                sourcedLogger.Debug("Crib: {crib} | {cutCard} -> {name} scores {score}", cardsText crib, cardText cutCard, (toPlayer dealer).Name, score)
+                events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))
                 let deal1 = if dealer = Player1 then { deal1 with CribScore = Some score } else deal1
                 let deal2 = if dealer = Player2 then { deal2 with CribScore = Some score } else deal2
                 Some (deal1, deal2), Some (dealer, crib, events)
@@ -388,10 +391,11 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
         let dealSummary = { Player1DealSummary = deal1 ; Player2DealSummary = deal2 }
         let newDealSummaries = dealSummary :: dealSummaries.Value
         let gameSummary = GameSummary.FromDealSummaries(newDealSummaries)
+        sourcedLogger.Debug("...game finished -> {name1} {score1} - {score2} {name2}", player1.Name, gameSummary.Player1Score, gameSummary.Player2Score, player2.Name)
+        sourcedLogger.Debug("...{name} wins the game (in {deals} deal/s)", (toPlayer gameSummary.Winner).Name, newDealSummaries.Length)
         let newGameSummaries = gameSummary :: gameSummaries.Value
         let games1, games2 = newGameSummaries |> List.sumBy (fun summary -> summary.Player1Game), newGameSummaries |> List.sumBy (fun summary -> summary.Player2Game)
-        sourcedLogger.Debug("...game finished -> {name1} ({games1}) {score1} - {score2} ({games2}) {name2}", player1.Name, games1, gameSummary.Player1Score, gameSummary.Player2Score, games2, player2.Name)
-        sourcedLogger.Debug("...{name} wins the game (in {deals} deal/s)", (toPlayer gameSummary.Winner).Name, newDealSummaries.Length)
+        sourcedLogger.Debug("...{name1} {games1} - {games2} {name2}", player1.Name, games1, games2, player2.Name)
         let newAwaitingNewGame = [
             if player1.IsInteractive then Player1
             if player2.IsInteractive then Player2 ]
