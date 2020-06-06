@@ -85,4 +85,6 @@ let randomSingle (cards:CardS) : Card = randomChoice 1 cards |> Set.maxElement
 
 let deckExcept (cards:CardS) : CardS = cards |> Set.difference unshuffledDeck
 
-let cut (deck:Deck) : Card = randomChoice 1 (deck |> Set.ofList) |> List.ofSeq |> List.head
+let cut (deck:Deck) : Card * Deck =
+    let cut = randomChoice 1 (deck |> Set.ofList) |> List.ofSeq |> List.head
+    cut, deck |> List.filter (fun card -> card <> cut)

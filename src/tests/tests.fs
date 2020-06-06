@@ -15,7 +15,7 @@ let [<Tests>] commonMathyTests =
                 Expect.isLessThanOrEqual value 1.0 "normalizedRandom () should be less than or equal to 1.0"
                 Expect.isGreaterThanOrEqual value 0.0 "normalizedRandom () should be greater than or equal to 0.0" } ]
 
-let [<Tests>] domainCoreTests = // TODO-NMB: randomSingle? | deckExcept? | ...
+let [<Tests>] domainCoreTests = // TODO-NMB: randomSingle? | deckExcept? | (cut?) | ...
     testList "Domain.Core tests" [
         test "pips should return correct value" {
             Expect.equal (pips [ sK ; dJ ; d8 ; hA ]) 29<pip> "pips did not return correct value" }
@@ -50,7 +50,8 @@ let [<Tests>] domainCoreTests = // TODO-NMB: randomSingle? | deckExcept? | ...
             Expect.hasLength (randomChoice 2 ([ hJ ; s9 ; s6 ; c3 ] |> Set.ofList)) 2 "randomChoice did not return correct number of Cards" }
 
         test "cut should return a single Card" {
-            Expect.hasLength [ cut [ hJ ; s9 ; s6 ; c3 ] ] 1 "cut did not return a single Card" } ]
+            let cutCard, _ = cut [ hJ ; s9 ; s6 ; c3 ]
+            Expect.hasLength [ cutCard ] 1 "cut did not return a single Card" } ]
 
 let [<Tests>] domainScoringTests =
     testList "Domain.Scoring tests" [
@@ -100,9 +101,9 @@ let [<Tests>] domainScoringTests =
             Expect.equal (HandScoreEvent.Process([ sK ; sQ ; s9 ; s8 ] |> Set.ofList, dJ)) expected "HandScoreEvent.Process did not return Run and FourFlush" }
 
         test "NibsScoreEvent.Process should return None" {
-            Expect.isNone (NibsScoreEvent.Process sQ) "NibsScoreEvent.Process did not return None" }
+            Expect.isNone (NibsScoreEvent.Process(sQ)) "NibsScoreEvent.Process did not return None" }
         test "NibsScoreEvent.Process should return Nibs" {
-            Expect.equal (NibsScoreEvent.Process sJ) (Some (Nibs sJ)) "NibsScoreEvent.Process did not return Nibs" } ]
+            Expect.equal (NibsScoreEvent.Process(sJ)) (Some (Nibs sJ)) "NibsScoreEvent.Process did not return Nibs" } ]
 
 let [<Tests>] domainScoringAdditionalTests =
     let handsEventsAndCribEvents () =
@@ -113,11 +114,11 @@ let [<Tests>] domainScoringAdditionalTests =
         let deck, dealt2 = dealToHand 6 (deck, Set.empty)
         let choice2 = randomChoice 2 dealt2
         let hand2, crib = removeFromHand (dealt2, choice2), addToCrib (crib, choice2)
-        let cut = cut deck
-        let hand1Events = HandScoreEvent.Process(hand1, cut)
-        let hand2Events = HandScoreEvent.Process(hand2, cut)
-        let cribEvents = CribScoreEvent.Process(crib, cut)
-        cut, hand1, hand1Events, hand2, hand2Events, crib, cribEvents
+        let cutCard, _ = cut deck
+        let hand1Events = HandScoreEvent.Process(hand1, cutCard)
+        let hand2Events = HandScoreEvent.Process(hand2, cutCard)
+        let cribEvents = CribScoreEvent.Process(crib, cutCard)
+        cutCard, hand1, hand1Events, hand2, hand2Events, crib, cribEvents
     let handScore (events:HandScoreEvent list) = events |> List.sumBy (fun event -> event.Score)
     let cribScore (events:CribScoreEvent list) = events |> List.sumBy (fun event -> event.Score)
     let mustNotBe19Or25or26or27 (cut:Card) (cards:CardS) isCrib score =
@@ -129,9 +130,9 @@ let [<Tests>] domainScoringAdditionalTests =
     testList "Domain.Scoring additional tests" [
         for n in 1..100000 do // perhaps excessive!
             yield test (sprintf "Hands and Crib can never score 19, 25, 26 or 27 -> iteration %i" n) {
-                let cut, hand1, hand1Events, hand2, hand2Events, crib, cribEvents = handsEventsAndCribEvents ()
-                mustNotBe19Or25or26or27 cut hand1 false (handScore hand1Events)
-                mustNotBe19Or25or26or27 cut hand2 false (handScore hand2Events)
-                mustNotBe19Or25or26or27 cut crib true (cribScore cribEvents) } ]
+                let cutCard, hand1, hand1Events, hand2, hand2Events, crib, cribEvents = handsEventsAndCribEvents ()
+                mustNotBe19Or25or26or27 cutCard hand1 false (handScore hand1Events)
+                mustNotBe19Or25or26or27 cutCard hand2 false (handScore hand2Events)
+                mustNotBe19Or25or26or27 cutCard crib true (cribScore cribEvents) } ]
 
-// TODO-NMB: strategyTests? | stateTests? | ...
+// TODO-NMB: strategyTests? | engineTests? | ...

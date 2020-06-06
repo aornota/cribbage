@@ -29,9 +29,9 @@ let computerVsComputer games = async {
         if total >= games then
             engine.Quit(Player1)
             loop <- false
-            // TODO-NMB: Output statistics, e.g. average pegging | hand | crib scores (when dealer | not-dealer) for each player?...
+            // TODO-NMB: Output statistics, e.g. average pegging | hand | crib scores (when dealer | non-dealer) for each player?...
     use _ = engine.Games.AddCallback gamesCallback
-    engine.Start()
+    async { engine.Start() } |> Async.Start
     while loop do
-        sourcedLogger.Debug "Sleeping..."
+        sourcedLogger.Debug("Sleeping...")
         do! Async.Sleep 1000 }
