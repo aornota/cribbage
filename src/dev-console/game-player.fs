@@ -11,8 +11,6 @@ open FSharp.Data.Adaptive
 open Serilog
 open System
 
-type private μp = Mean<point>
-
 let [<Literal>] private SOURCE = "DevConsole.GamePlayer"
 
 let private sourcedLogger = sourcedLogger SOURCE Log.Logger
@@ -25,16 +23,19 @@ let private validateGames games =
 
 let private log (name1:string) (name2:string) (games:int<game>) = sourcedLogger.Information("{name1} vs. {name2} ({games} game/s)...", name1, name2, games)
 
-let private statistics (name:string) games (peggingMean:μp, peggingDealerMean:μp, peggingNotDealerMean:μp, handMean:μp, handDealerMean:μp, handNotDealerMean:μp, cribMean:μp) =
-    sourcedLogger.Information("Statistics for {name} ({games} games):", name, games)
-    (* TODO-NMB: Once non-zero...
-    sourcedLogger.Information("\tMean pegging score -> {mean}", Math.Round(float peggingMean.Mean, 2))
-    sourcedLogger.Information("\t\twhen dealer -> {mean}", Math.Round(float peggingDealerMean.Mean, 2))
-    sourcedLogger.Information("\t\twhen not dealer -> {mean}", Math.Round(float peggingNotDealerMean.Mean, 2)) *)
-    sourcedLogger.Information("\tMean hand score -> {mean}", Math.Round(float handMean.Mean, 2))
-    sourcedLogger.Information("\t\twhen dealer -> {mean}", Math.Round(float handDealerMean.Mean, 2))
-    sourcedLogger.Information("\t\twhen not dealer -> {mean}", Math.Round(float handNotDealerMean.Mean, 2))
-    sourcedLogger.Information("\tMean crib score -> {mean}", Math.Round(float cribMean.Mean, 2))
+let private statistics (name:string) (statistics:(int<game> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point>) option) =
+    match statistics with
+    | Some (games, peggingMean, peggingDealerMean, peggingNotDealerMean, handMean, handDealerMean, handNotDealerMean, cribMean) ->
+        sourcedLogger.Information("Statistics for {name} ({games} game/s):", name, games)
+        (* TODO-NMB: Once non-zero...
+        sourcedLogger.Information("\tMean pegging score -> {mean}", Math.Round(float peggingMean.Mean, 2))
+        sourcedLogger.Debug("\t\twhen dealer -> {mean}", Math.Round(float peggingDealerMean.Mean, 2))
+        sourcedLogger.Debug("\t\twhen not dealer -> {mean}", Math.Round(float peggingNotDealerMean.Mean, 2)) *)
+        sourcedLogger.Information("\tMean hand score -> {mean}", Math.Round(float handMean.Mean, 2))
+        sourcedLogger.Debug("\t\twhen dealer -> {mean}", Math.Round(float handDealerMean.Mean, 2))
+        sourcedLogger.Debug("\t\twhen not dealer -> {mean}", Math.Round(float handNotDealerMean.Mean, 2))
+        sourcedLogger.Information("\tMean crib score -> {mean}", Math.Round(float cribMean.Mean, 2))
+    | None -> ()
 
 let private gamesCallback (name1:string) (name2:string) games (engine:Engine) (games1, games2) =
     let total = games1 + games2
@@ -42,8 +43,8 @@ let private gamesCallback (name1:string) (name2:string) games (engine:Engine) (g
     if total >= games then
         engine.Quit(if games1 > games2 then Player2 else Player1)
         hasQuit <- true
-        statistics name1 games (engine.Statistics(Player1) |> AVal.force)
-        statistics name2 games (engine.Statistics(Player2) |> AVal.force)
+        statistics name1 (engine.Statistics(Player1) |> AVal.force)
+        statistics name2 (engine.Statistics(Player2) |> AVal.force)
 
 let private scoresCallback (name1:string) (name2:string) (score1, score2) = if score1 + score2 > 0<point> then sourcedLogger.Debug("...{name1} {score1} - {score2} {name2}", name1, score1, score2, name2)
 
@@ -57,45 +58,42 @@ let private awaitingNewGameCallback = function
     | Some newGame -> if not hasQuit then newGame () else ()
     | None -> ()
 
-let computerVsComputer games =
+let basicStrategy : ForCribStrategy * PegStrategy = forCribBasic, pegBasic
+let randomStrategy : ForCribStrategy * PegStrategy = forCribRandom, pegRandom
+
+let computerVsComputer (computer1, strategy1) (computer2, strategy2) games =
     let games = validateGames games
-    //let name1, name2 = "Basic 1", "Basic 2"
-    let name1, name2 = "Basic", "Random"
-    //let name1, name2 = "Random 1", "Random 2"
-    log name1 name2 games
-    //let engine = Engine(Computer (name1, forCribBasic, pegBasic), Computer (name2, forCribBasic, pegBasic))
-    let engine = Engine(Computer (name1, forCribBasic, pegBasic), Computer (name2, forCribRandom, pegRandom))
-    //let engine = Engine(Computer (name1, forCribRandom, pegRandom), Computer (name2, forCribRandom, pegRandom))
-    use gamesCallback = engine.Games.AddCallback (gamesCallback name1 name2 games engine)
-    use scoresCallback = engine.Scores.AddCallback (scoresCallback name1 name2)
+    let computer1, computer2 = if computer1 = computer2 then sprintf "%s %i" computer1 1, sprintf "%s %i" computer2 2 else computer1, computer2
+    log computer1 computer2 games
+    let engine = Engine(Computer (computer1, fst strategy1, snd strategy1), Computer (computer2, fst strategy2, snd strategy2))
+    use gamesCallback = engine.Games.AddCallback (gamesCallback computer1 computer2 games engine)
+    use scoresCallback = engine.Scores.AddCallback (scoresCallback computer1 computer2)
     engine.Start()
 
-let humanVsComputer games =
+let humanVsComputer (human, strategy1:ForCribStrategy * PegStrategy) (computer, strategy2) games =
     let games = validateGames games
-    let name1, name2 = "Neph", "Random"
-    log name1 name2 games
-    let engine = Engine(Human name1, Computer (name2, forCribRandom, pegRandom))
-    use gamesCallback = engine.Games.AddCallback (gamesCallback name1 name2 games engine)
-    use scoresCallback = engine.Scores.AddCallback (scoresCallback name1 name2)
-    use awaitingForCrib1Callback = engine.AwaitingForCrib(Player1).AddCallback (awaitingForCribCallback forCribBasic)
-    // TODO-NMB...use awaitingPeg1Callback = engine.AwaitingPeg(Player1).AddCallback (awaitingPegCallback pegBasic)
+    log human computer games
+    let engine = Engine(Human human, Computer (computer, fst strategy2, snd strategy2))
+    use gamesCallback = engine.Games.AddCallback (gamesCallback human computer games engine)
+    use scoresCallback = engine.Scores.AddCallback (scoresCallback human computer)
+    use awaitingForCrib1Callback = engine.AwaitingForCrib(Player1).AddCallback (awaitingForCribCallback (fst strategy1))
+    // TODO-NMB...use awaitingPeg1Callback = engine.AwaitingPeg(Player1).AddCallback (awaitingPegCallback (snd strategy1))
     // TODO-NMB...use awaitingCannotPeg1Callback = engine.AwaitingCannotPeg(Player1).AddCallback awaitingCannotPegCallback
     use awaitingNewDeal1Callback = engine.AwaitingNewDeal(Player1).AddCallback awaitingNewDealCallback
     use awaitingNewGame1Callback = engine.AwaitingNewGame(Player1).AddCallback awaitingNewGameCallback
     engine.Start()
 
-let humanVsHuman games =
+let humanVsHuman (human1, strategy1:ForCribStrategy * PegStrategy) (human2, strategy2:ForCribStrategy * PegStrategy) games =
     let games = validateGames games
-    let name1, name2 = "Neph", "Jack"
-    log name1 name2 games
-    let engine = Engine(Human name1, Human name2)
-    use gamesCallback = engine.Games.AddCallback (gamesCallback name1 name2 games engine)
-    use scoresCallback = engine.Scores.AddCallback (scoresCallback name1 name2)
-    use awaitingForCrib1Callback = engine.AwaitingForCrib(Player1).AddCallback (awaitingForCribCallback forCribBasic)
-    use awaitingForCrib2Callback = engine.AwaitingForCrib(Player2).AddCallback (awaitingForCribCallback forCribBasic)
-    // TODO-NMB...use awaitingPeg1Callback = engine.AwaitingPeg(Player1).AddCallback (awaitingPegCallback pegBasic)
+    log human1 human2 games
+    let engine = Engine(Human human1, Human human2)
+    use gamesCallback = engine.Games.AddCallback (gamesCallback human1 human2 games engine)
+    use scoresCallback = engine.Scores.AddCallback (scoresCallback human1 human2)
+    use awaitingForCrib1Callback = engine.AwaitingForCrib(Player1).AddCallback (awaitingForCribCallback (fst strategy1))
+    use awaitingForCrib2Callback = engine.AwaitingForCrib(Player2).AddCallback (awaitingForCribCallback (fst strategy2))
+    // TODO-NMB...use awaitingPeg1Callback = engine.AwaitingPeg(Player1).AddCallback (awaitingPegCallback (snd strategy1))
     // TODO-NMB...use awaitingCannotPeg1Callback = engine.AwaitingCannotPeg(Player1).AddCallback awaitingCannotPegCallback
-    // TODO-NMB...use awaitingPeg2Callback = engine.AwaitingPeg(Player2).AddCallback (awaitingPegCallback pegBasic)
+    // TODO-NMB...use awaitingPeg2Callback = engine.AwaitingPeg(Player2).AddCallback (awaitingPegCallback (snd strategy2))
     // TODO-NMB...use awaitingCannotPeg2Callback = engine.AwaitingCannotPeg(Player2).AddCallback awaitingCannotPegCallback
     use awaitingNewDeal1Callback = engine.AwaitingNewDeal(Player1).AddCallback awaitingNewDealCallback
     use awaitingNewDeal1Callback = engine.AwaitingNewDeal(Player2).AddCallback awaitingNewDealCallback

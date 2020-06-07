@@ -491,7 +491,7 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
         let! hand2 = hand2
         return hand2.Count = DEALT_HAND_COUNT }
     member _.CutCard = cutCard
-    member _.NibsEvent = nibsEvent
+    member _.NibsEvent = nibsEvent // TODO-NMB: Include function to clear?...
     // TODO-NMB: AwaitingPeg (return (Pagged * Peggable * (Card option -> unit)) option) | AwaitingCannotPeg | ...
     member _.NonDealerHandEvents = nonDealerHandEvents
     member _.DealerHandEvents = dealerHandEvents
@@ -509,13 +509,19 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
     member _.Quit(player) = quit player
     member _.Statistics(player) = adaptive {
         let! gameSummaries = gameSummaries
-        let playerGameSummaries = gameSummaries |> List.map (fun summary -> if player = Player1 then summary.Player1GameSummary else summary.Player2GameSummary)
-        let zero = { Total = 0<point> ; Count = 0 }
-        let peggingMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingMean)) zero
-        let peggingDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingDealerMean)) zero
-        let peggingNotDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingNotDealerMean)) zero
-        let handMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandMean)) zero
-        let handDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandDealerMean)) zero
-        let handNotDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandNotDealerMean)) zero
-        let cribMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.CribMean)) zero
-        return peggingMean, peggingDealerMean, peggingNotDealerMean, handMean, handDealerMean, handNotDealerMean, cribMean }
+        let statistics =
+            match gameSummaries with
+            | h :: t ->
+                let playerGameSummaries = h :: t |> List.map (fun summary -> if player = Player1 then summary.Player1GameSummary else summary.Player2GameSummary)
+                let games = playerGameSummaries.Length * 1<game>
+                let zero = { Total = 0<point> ; Count = 0 }
+                let peggingMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingMean)) zero
+                let peggingDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingDealerMean)) zero
+                let peggingNotDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingNotDealerMean)) zero
+                let handMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandMean)) zero
+                let handDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandDealerMean)) zero
+                let handNotDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandNotDealerMean)) zero
+                let cribMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.CribMean)) zero
+                Some (games, peggingMean, peggingDealerMean, peggingNotDealerMean, handMean, handDealerMean, handNotDealerMean, cribMean)
+            | [] -> None
+        return statistics }

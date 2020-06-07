@@ -9,8 +9,6 @@ exception CannotPlayCardException of string
 exception DoesNotContain4CardsException of string
 exception MustNotContainCutCardException of string
 
-type Pegged = CardL
-
 let isRun (cards:CardL) =
     match cards.Length with
     | len when len > 2 ->
@@ -31,7 +29,7 @@ type PeggingScoreEvent =
     | ThirtyOne
     | Go
     with
-    static member Play (pegged:Pegged, card:Card option) : PeggingScoreEvent list =
+    static member Play (pegged:CardL, card:Card option) : PeggingScoreEvent list =
         match card, pegged with
         | None, [] -> raise (CannotPlayNoneException "Cannot play None when no Cards pegged")
         | None, _ -> [ Go ]

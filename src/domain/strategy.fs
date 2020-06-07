@@ -8,6 +8,8 @@ exception PartialCribDoesNotContain2CardsException of string
 exception PartialCribMustNotContainCutCardException of string
 
 type IsDealer = bool
+type IsSelf = bool
+type Pegged = (Card * IsSelf) list
 type Peggable = CardS
 
 // TODO-NMB: For advanced strategy, augment with subset of "game state" (e.g. scores | pegging "history")?...
@@ -45,6 +47,7 @@ let private pegNoneOrRandom (peggable:Peggable) = if peggable.Count = 0 then Non
 let pegRandom (_:Pegged, peggable:Peggable) = pegNoneOrRandom peggable
 
 let pegBasic (pegged:Pegged, peggable:Peggable) = // chooses highest-scoring card, else "safest", else random
+    let pegged = pegged |> List.map fst
     let highestScoring =
         let scoring =
             peggable
