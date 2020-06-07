@@ -507,3 +507,15 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
         | Some (AwaitingNewGame players) when players |> List.contains player -> return Some (fun () -> interact (RequestNewGame player))
         | _ -> return None }
     member _.Quit(player) = quit player
+    member _.Statistics(player) = adaptive {
+        let! gameSummaries = gameSummaries
+        let playerGameSummaries = gameSummaries |> List.map (fun summary -> if player = Player1 then summary.Player1GameSummary else summary.Player2GameSummary)
+        let zero = { Total = 0<point> ; Count = 0 }
+        let peggingMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingMean)) zero
+        let peggingDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingDealerMean)) zero
+        let peggingNotDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingNotDealerMean)) zero
+        let handMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandMean)) zero
+        let handDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandDealerMean)) zero
+        let handNotDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandNotDealerMean)) zero
+        let cribMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.CribMean)) zero
+        return peggingMean, peggingDealerMean, peggingNotDealerMean, handMean, handDealerMean, handNotDealerMean, cribMean }
