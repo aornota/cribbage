@@ -36,7 +36,7 @@ let private mainAsync argv = async {
 
     try //GamePlayer.computerVsComputer 1
         //GamePlayer.humanVsComputer 3
-        GamePlayer.humanVsHuman 9
+        GamePlayer.humanVsHuman 1
 
         (* TEMP-NMB...
         Scratchpad.workInProgress () *)

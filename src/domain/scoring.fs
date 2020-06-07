@@ -11,7 +11,7 @@ exception MustNotContainCutCardException of string
 
 type Pegged = CardL
 
-let private isRun (cards:CardL) =
+let isRun (cards:CardL) =
     match cards.Length with
     | len when len > 2 ->
         let ranks = cards |> List.map fst
@@ -77,7 +77,7 @@ type PeggingScoreEvent =
         | ThirtyOne -> sprintf "Thirty-one for %i" this.Score
         | Go -> sprintf "Go for %i" this.Score
 
-let rec private fifteens acc (cardsL:CardL list) =
+let rec fifteens acc (cardsL:CardL list) =
     cardsL
     |> List.collect (fun cards ->
         match cards.Length with
