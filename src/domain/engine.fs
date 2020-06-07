@@ -173,9 +173,6 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
     let awaitingNewDeal : cval<Player list> = cval []
     let awaitingNewGame : cval<Player list> = cval []
     let quitter : cval<Player option> = cval None
-    let games = adaptive {
-        let! gameSummaries = gameSummaries
-        return gameSummaries |> List.sumBy (fun summary -> summary.Player1Game), gameSummaries |> List.sumBy (fun summary -> summary.Player2Game) }
     let scores = adaptive {
         let! dealSummaries = dealSummaries
         let! currentDeal = currentDeal
@@ -473,14 +470,19 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
         | _ -> raise (InvalidInteractionException (sprintf "%A when %A" interaction awaitingInteraction))
     member _.Start() = engine ()
     member _.Players = player1, player2
-    member _.Games = games
+    member _.Games = adaptive {
+        let! gameSummaries = gameSummaries
+        return gameSummaries |> List.sumBy (fun summary -> summary.Player1Game), gameSummaries |> List.sumBy (fun summary -> summary.Player2Game) }
     member _.Scores = scores
     member _.Dealer = currentDealer
-    member _.AwaitingForCrib(player) = adaptive { // TODO-NMB: Will the use of player work?...
+    member _.AwaitingForCrib(player) = adaptive {
+        let! currentDealer = currentDealer
         let! hand = toHand player
         let! awaitingInteraction = awaitingInteraction
         match awaitingInteraction with
-        | Some (AwaitingForCrib players) when players |> List.contains player -> return Some (hand, fun forCrib -> interact (ForCrib (player, forCrib)))
+        | Some (AwaitingForCrib players) when players |> List.contains player ->
+            let isDealer = match currentDealer with | Some dealer when dealer = player -> true | _ -> false
+            return Some (isDealer, hand, fun forCrib -> interact (ForCrib (player, forCrib)))
         | _ -> return None }
     member _.AwaitingCrib1 = adaptive {
         let! hand1 = hand1
@@ -490,7 +492,7 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
         return hand2.Count = DEALT_HAND_COUNT }
     member _.CutCard = cutCard
     member _.NibsEvent = nibsEvent
-    // TODO-NMB: AwaitingPeg (return (Peggable * function) option?) | AwaitingCannotPeg | ...
+    // TODO-NMB: AwaitingPeg (return (Pagged * Peggable * (Card option -> unit)) option) | AwaitingCannotPeg | ...
     member _.NonDealerHandEvents = nonDealerHandEvents
     member _.DealerHandEvents = dealerHandEvents
     member _.CribEvents = cribEvents
