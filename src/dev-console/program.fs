@@ -35,11 +35,11 @@ let private mainAsync argv = async {
     let mutable retval = 0
 
     try (* TEMP-NMB... *)
-        GamePlayer.computerVsComputer ("Basic", GamePlayer.basicStrategy) ("Random", GamePlayer.randomStrategy) 1
+        GamePlayer.computerVsComputer GamePlayer.better GamePlayer.basic 1
         (* TEMP-NMB...
-        GamePlayer.humanVsComputer ("Neph", GamePlayer.basicStrategy) ("Random", GamePlayer.randomStrategy) 1 *)
+        GamePlayer.humanVsComputer GamePlayer.neph GamePlayer.random 1 *)
         (* TEMP-NMB...
-        GamePlayer.humanVsHuman ("Neph", GamePlayer.basicStrategy) ("Jack", GamePlayer.basicStrategy) 1 *)
+        GamePlayer.humanVsHuman GamePlayer.neph GamePlayer.jack 1 *)
 
         (* TEMP-NMB...
         Scratchpad.workInProgress () *)

@@ -27,9 +27,7 @@ let private partialCribScore (isDealer:IsDealer) (partialCrib:CardL) (cutCard:Ca
     let runScore = if distinctRanks = 3 then match isRun all with | Some _ -> 3 | None -> 0 else 0
     (fifteensScore + pairsScore + runScore) * (if isDealer then 1<point> else -1<point>)
 
-let forCribRandom (_:IsDealer, dealt:Hand) = randomChoice 2 dealt
-
-let forCribBasic (isDealer:IsDealer, dealt:Hand) : CardS = // chooses 2-card combination with highest mean hand score (adjusted by "partial crib" score) for all possible cut cards
+let private forCrib adjustForPartialCribScore (isDealer:IsDealer, dealt:Hand) : CardS = // chooses 2-card combination with highest mean hand score (adjusted by "partial crib" score) for all possible cut cards
     let cutCards = deckExcept dealt
     let combo, _ =
         combinations [] 2 (dealt |> List.ofSeq)
@@ -38,9 +36,14 @@ let forCribBasic (isDealer:IsDealer, dealt:Hand) : CardS = // chooses 2-card com
             cutCards
             |> Seq.averageBy (fun cutCard ->
                 let handScore = HandScoreEvent.Process(hand, cutCard) |> List.sumBy (fun event -> event.Score)
-                let partialCribScore = partialCribScore isDealer combo cutCard
-                float (handScore + partialCribScore)))
+                float (if adjustForPartialCribScore then handScore + (partialCribScore isDealer combo cutCard) else handScore)))
     combo |> Set.ofList
+
+let forCribRandom (_:IsDealer, dealt:Hand) = randomChoice 2 dealt
+
+let forCribBasic (isDealer:IsDealer, dealt:Hand) : CardS = forCrib false (isDealer, dealt)
+
+let forCribBetter (isDealer:IsDealer, dealt:Hand) : CardS = forCrib true (isDealer, dealt)
 
 let private pegNoneOrRandom (peggable:Peggable) = if peggable.Count = 0 then None else Some (randomSingle peggable)
 

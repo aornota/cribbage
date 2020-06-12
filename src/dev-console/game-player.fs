@@ -58,8 +58,15 @@ let private awaitingNewGameCallback = function
     | Some newGame -> if not hasQuit then newGame () else ()
     | None -> ()
 
-let basicStrategy : ForCribStrategy * PegStrategy = forCribBasic, pegBasic
-let randomStrategy : ForCribStrategy * PegStrategy = forCribRandom, pegRandom
+let private betterStrategy : ForCribStrategy * PegStrategy = forCribBetter, pegBasic
+let private basicStrategy : ForCribStrategy * PegStrategy = forCribBasic, pegBasic
+let private randomStrategy : ForCribStrategy * PegStrategy = forCribRandom, pegRandom
+
+let better = ("Better", betterStrategy)
+let basic = ("Basic", basicStrategy)
+let random = ("Random", randomStrategy)
+let neph = ("Neph", betterStrategy)
+let jack = ("Jack", basicStrategy)
 
 let computerVsComputer (computer1, strategy1) (computer2, strategy2) games =
     let games = validateGames games
