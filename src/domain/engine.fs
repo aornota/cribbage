@@ -163,16 +163,20 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
     let hand2 : cval<Hand> = cval Set.empty
     let crib : cval<Crib> = cval Set.empty
     let cutCard : cval<Card option> = cval None
-    let nibsEvent : cval<(Player * NibsScoreEvent) option> = cval None
     let peg1 : cval<Hand> = cval Set.empty
     let peg2 : cval<Hand> = cval Set.empty
     // TODO-NMB: More pegging?...
+    // TODO-NMB: Remove nonDealerHandEvents | dealerHandEvents | cribEvents once State does not rely on these...
     let nonDealerHandEvents : cval<(Player * Hand * HandScoreEvent list) option> = cval None
     let dealerHandEvents : cval<(Player * Hand * HandScoreEvent list) option> = cval None
     let cribEvents : cval<(Player * Crib * CribScoreEvent list) option> = cval None
     let awaitingNewDeal : cval<Player list> = cval []
     let awaitingNewGame : cval<Player list> = cval []
     let quitter : cval<Player option> = cval None
+    let nibsScoreEvent = new Event<Player * Card * NibsScoreEvent>()
+    // TODO-NMB: Pegging event/s...
+    let handScoreEvent = new Event<Player * Hand * Card * HandScoreEvent list>()
+    let cribScoreEvent = new Event<Player * Crib * Card * CribScoreEvent list>()
     let scores = adaptive {
         let! dealSummaries = dealSummaries
         let! currentDeal = currentDeal
@@ -253,7 +257,6 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
             hand2.Value <- dealt2
             crib.Value <- Set.empty
             cutCard.Value <- None
-            nibsEvent.Value <- None
             peg1.Value <- Set.empty
             peg2.Value <- Set.empty
             // TODO-NMB: More pegging?...
@@ -281,22 +284,23 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
     let cut () =
         if cutCard.Value |> Option.isSome then raise AlreadyCutException
         let newCutCard, newDeck = cut deck.Value
-        let newCurrentDeal, newNibsEvent =
+        let newCurrentDeal =
             match currentDeal.Value, NibsScoreEvent.Process(newCutCard) with
             | None, _ -> raise NoCurrentDealException
-            | _, None -> None, None
+            | _, None ->
+                sourcedLogger.Debug("Cut: {cutCard}", cardText newCutCard)
+                None
             | Some (deal1, deal2), Some event ->
                 let dealer, score = dealer (), event.Score
                 let deal1 = if dealer = Player1 then { deal1 with NibsScore = Some score } else deal1
                 let deal2 = if dealer = Player2 then { deal2 with NibsScore = Some score } else deal2
-                Some (deal1, deal2), Some (dealer, event)
-        let nibsEventText = match newNibsEvent with | Some (dealer, event) -> sprintf " -> %s scores %s" (toPlayer dealer).Name event.Text | None -> String.Empty
-        sourcedLogger.Debug("Cut: {cutCard}{nibsEventText}", cardText newCutCard, nibsEventText)
+                sourcedLogger.Debug("Cut: {cutCard} -> {name} scores {event}", cardText newCutCard, (toPlayer dealer).Name, event.Text)
+                nibsScoreEvent.Trigger(dealer, newCutCard, event)
+                Some (deal1, deal2)
         transact (fun _ ->
             match newCurrentDeal with | Some newCurrentDeal -> currentDeal.Value <- Some newCurrentDeal | None -> ()
             deck.Value <- newDeck
             cutCard.Value <- Some newCutCard
-            match newNibsEvent with | Some newNibsEvent -> nibsEvent.Value <- Some newNibsEvent | None -> ()
             peg1.Value <- hand1.Value
             peg2.Value <- hand2.Value)
 
@@ -311,7 +315,6 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
                 Some (deal1, deal2)
         transact (fun _ ->
             match newCurrentDeal with | Some newCurrentDeal -> currentDeal.Value <- Some newCurrentDeal | None -> ()
-            nibsEvent.Value <- None // TODO-NMB: Only reset once first card pegged...
             peg1.Value <- Set.empty
             peg2.Value <- Set.empty)
     // TODO-NMB: More pegging (remember to reset nibsEvent)?...
@@ -319,7 +322,7 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
     let scoreNonDealerHand () =
         if nonDealerHandEvents.Value |> Option.isSome then raise AlreadyScoredException
         let nonDealer = if dealer () = Player1 then Player2 else Player1
-        let newCurrentDeal, newNonDealerHandEvents =
+        let newCurrentDeal, events =
             match currentDeal.Value, cutCard.Value with
             | None, _ -> raise NoCurrentDealException
             | _, None -> raise NotCutException
@@ -327,18 +330,19 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
                 let hand = if nonDealer = Player1 then hand1.Value else hand2.Value
                 let events = HandScoreEvent.Process(hand, cutCard)
                 let score = events |> List.sumBy (fun event -> event.Score)
-                sourcedLogger.Debug("Hand: {hand} | {cutCard} -> {name} scores {score}", cardsText hand, cardText cutCard, (toPlayer nonDealer).Name, score)
-                events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))
                 let deal1 = if nonDealer = Player1 then { deal1 with HandScore = Some score } else deal1
                 let deal2 = if nonDealer = Player2 then { deal2 with HandScore = Some score } else deal2
+                sourcedLogger.Debug("Hand: {hand} | {cutCard} -> {name} scores {score}", cardsText hand, cardText cutCard, (toPlayer nonDealer).Name, score)
+                events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))
+                handScoreEvent.Trigger(nonDealer, hand, cutCard, events)
                 Some (deal1, deal2), Some (nonDealer, hand, events)
         transact (fun _ ->
             match newCurrentDeal with | Some newCurrentDeal -> currentDeal.Value <- Some newCurrentDeal | None -> ()
-            match newNonDealerHandEvents with | Some newNonDealerHandEvents -> nonDealerHandEvents.Value <- Some newNonDealerHandEvents | None -> ())
+            match events with | Some events -> nonDealerHandEvents.Value <- Some events | None -> ())
     let scoreDealerHand () =
         if dealerHandEvents.Value |> Option.isSome then raise AlreadyScoredException
         let dealer = dealer ()
-        let newCurrentDeal, newDealerHandEvents =
+        let newCurrentDeal, events =
             match currentDeal.Value, cutCard.Value with
             | None, _ -> raise NoCurrentDealException
             | _, None -> raise NotCutException
@@ -346,18 +350,19 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
                 let hand = if dealer = Player1 then hand1.Value else hand2.Value
                 let events = HandScoreEvent.Process(hand, cutCard)
                 let score = events |> List.sumBy (fun event -> event.Score)
-                sourcedLogger.Debug("Hand: {hand} | {cutCard} -> {name} scores {score}", cardsText hand, cardText cutCard, (toPlayer dealer).Name, score)
-                events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))
                 let deal1 = if dealer = Player1 then { deal1 with HandScore = Some score } else deal1
                 let deal2 = if dealer = Player2 then { deal2 with HandScore = Some score } else deal2
+                sourcedLogger.Debug("Hand: {hand} | {cutCard} -> {name} scores {score}", cardsText hand, cardText cutCard, (toPlayer dealer).Name, score)
+                events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))
+                handScoreEvent.Trigger(dealer, hand, cutCard, events)
                 Some (deal1, deal2), Some (dealer, hand, events)
         transact (fun _ ->
             match newCurrentDeal with | Some newCurrentDeal -> currentDeal.Value <- Some newCurrentDeal | None -> ()
-            match newDealerHandEvents with | Some newDealerHandEvents -> dealerHandEvents.Value <- Some newDealerHandEvents | None -> ())
+            match events with | Some events -> dealerHandEvents.Value <- Some events | None -> ())
     let scoreCrib () =
         if cribEvents.Value |> Option.isSome then raise AlreadyScoredException
         let dealer = dealer ()
-        let newCurrentDeal, newCribEvents =
+        let newCurrentDeal, events =
             match currentDeal.Value, cutCard.Value with
             | None, _ -> raise NoCurrentDealException
             | _, None -> raise NotCutException
@@ -365,14 +370,15 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
                 let crib = crib.Value
                 let events = CribScoreEvent.Process(crib, cutCard)
                 let score = events |> List.sumBy (fun event -> event.Score)
-                sourcedLogger.Debug("Crib: {crib} | {cutCard} -> {name} scores {score}", cardsText crib, cardText cutCard, (toPlayer dealer).Name, score)
-                events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))
                 let deal1 = if dealer = Player1 then { deal1 with CribScore = Some score } else deal1
                 let deal2 = if dealer = Player2 then { deal2 with CribScore = Some score } else deal2
+                sourcedLogger.Debug("Crib: {crib} | {cutCard} -> {name} scores {score}", cardsText crib, cardText cutCard, (toPlayer dealer).Name, score)
+                events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))
+                cribScoreEvent.Trigger(dealer, crib, cutCard, events)
                 Some (deal1, deal2), Some (dealer, crib, events)
         transact (fun _ ->
             match newCurrentDeal with | Some newCurrentDeal -> currentDeal.Value <- Some newCurrentDeal | None -> ()
-            match newCribEvents with | Some newCribEvents -> cribEvents.Value <- Some newCribEvents | None -> ())
+            match events with | Some events -> cribEvents.Value <- Some events | None -> ())
     let processDeal deal1 deal2 =
         let dealSummary = { Player1DealSummary = deal1 ; Player2DealSummary = deal2 }
         sourcedLogger.Debug("...deal finished -> {name1} scored {score1} and {name2} scored {score2}", player1.Name, deal1.Score, player2.Name, deal2.Score)
@@ -491,11 +497,11 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
         let! hand2 = hand2
         return hand2.Count = DEALT_HAND_COUNT }
     member _.CutCard = cutCard
-    member _.NibsEvent = nibsEvent // TODO-NMB: Include function to clear?...
+    member _.NibsScoreEvent = nibsScoreEvent.Publish
     // TODO-NMB: AwaitingPeg (return (Pagged * Peggable * (Card option -> unit)) option) | AwaitingCannotPeg | ...
-    member _.NonDealerHandEvents = nonDealerHandEvents
-    member _.DealerHandEvents = dealerHandEvents
-    member _.CribEvents = cribEvents
+    // TODO-NMB: Pegging event/s...
+    member _.HandScoreEvent = handScoreEvent.Publish
+    member _.CribScoreEvent = cribScoreEvent.Publish
     member _.AwaitingNewDeal(player) = adaptive {
         let! awaitingInteraction = awaitingInteraction
         match awaitingInteraction with
@@ -512,8 +518,14 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
         let statistics =
             match gameSummaries with
             | h :: t ->
-                let playerGameSummaries = h :: t |> List.map (fun summary -> if player = Player1 then summary.Player1GameSummary else summary.Player2GameSummary)
+                let playerGameSummaries =
+                    h :: t
+                    |> List.map (fun summary ->
+                        let won = summary.Winner = player
+                        (if player = Player1 then summary.Player1GameSummary else summary.Player2GameSummary), won)
                 let games = playerGameSummaries.Length * 1<game>
+                let winPercentage = (float (playerGameSummaries |> List.filter (fun (_, won) -> won) |> List.length) / float games) * 100.0
+                let playerGameSummaries = playerGameSummaries |> List.map fst
                 let zero = { Total = 0<point> ; Count = 0 }
                 let peggingMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingMean)) zero
                 let peggingDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingDealerMean)) zero
@@ -522,6 +534,6 @@ type Engine (player1:PlayerDetails, player2:PlayerDetails) =
                 let handDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandDealerMean)) zero
                 let handNotDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandNotDealerMean)) zero
                 let cribMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.CribMean)) zero
-                Some (games, peggingMean, peggingDealerMean, peggingNotDealerMean, handMean, handDealerMean, handNotDealerMean, cribMean)
+                Some (games, winPercentage, peggingMean, peggingDealerMean, peggingNotDealerMean, handMean, handDealerMean, handNotDealerMean, cribMean)
             | [] -> None
         return statistics }

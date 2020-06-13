@@ -23,11 +23,12 @@ let private validateGames games =
 
 let private log (name1:string) (name2:string) (games:int<game>) = sourcedLogger.Information("{name1} vs. {name2} ({games} game/s)...", name1, name2, games)
 
-let private statistics (name:string) (statistics:(int<game> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point>) option) =
+let private statistics (name:string) (statistics:(int<game> * float * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point>) option) =
     match statistics with
-    | Some (games, peggingMean, peggingDealerMean, peggingNotDealerMean, handMean, handDealerMean, handNotDealerMean, cribMean) ->
+    | Some (games, winPercentage, peggingMean, peggingDealerMean, peggingNotDealerMean, handMean, handDealerMean, handNotDealerMean, cribMean) ->
         sourcedLogger.Information("Statistics for {name} ({games} game/s):", name, games)
-        (* TODO-NMB: Once non-zero...
+        sourcedLogger.Information("\tWin percentage -> {percentage}%", Math.Round(winPercentage, 2))
+        (* TODO-NMB: Pegging (once non-zero)...
         sourcedLogger.Information("\tMean pegging score -> {mean}", Math.Round(float peggingMean.Mean, 2))
         sourcedLogger.Debug("\t\twhen dealer -> {mean}", Math.Round(float peggingDealerMean.Mean, 2))
         sourcedLogger.Debug("\t\twhen not dealer -> {mean}", Math.Round(float peggingNotDealerMean.Mean, 2)) *)
@@ -54,25 +55,31 @@ let private awaitingPegCallback strategy = function | Some (pegged, peggable, pe
 let private awaitingCannotPegCallback = function | Some cannotPeg -> cannotPeg () | None -> ()
 
 let private awaitingNewDealCallback = function | Some newDeal -> newDeal () | None -> ()
-let private awaitingNewGameCallback = function
-    | Some newGame -> if not hasQuit then newGame () else ()
-    | None -> ()
+let private awaitingNewGameCallback = function | Some newGame -> (if not hasQuit then newGame () else ()) | None -> ()
 
 let private betterStrategy : ForCribStrategy * PegStrategy = forCribBetter, pegBasic
 let private basicStrategy : ForCribStrategy * PegStrategy = forCribBasic, pegBasic
 let private randomStrategy : ForCribStrategy * PegStrategy = forCribRandom, pegRandom
 
-let better = ("Better", betterStrategy)
-let basic = ("Basic", basicStrategy)
-let random = ("Random", randomStrategy)
-let neph = ("Neph", betterStrategy)
-let jack = ("Jack", basicStrategy)
+let better, basic, random = ("Better", betterStrategy), ("Basic", basicStrategy), ("Random", randomStrategy)
+let neph, jack = ("Neph", betterStrategy), ("Jack", basicStrategy)
 
 let computerVsComputer (computer1, strategy1) (computer2, strategy2) games =
     let games = validateGames games
     let computer1, computer2 = if computer1 = computer2 then sprintf "%s %i" computer1 1, sprintf "%s %i" computer2 2 else computer1, computer2
     log computer1 computer2 games
     let engine = Engine(Computer (computer1, fst strategy1, snd strategy1), Computer (computer2, fst strategy2, snd strategy2))
+    (* TEMP-NMB: Testing events...
+    engine.NibsScoreEvent.Add(fun (player, cutCard, event) ->
+        sourcedLogger.Information("Cut: {cutCard} -> {player} scores {event}", cardText cutCard, (if player = Player1 then computer1 else computer2), event.Text))
+    engine.HandScoreEvent.Add(fun (player, hand, cutCard, events) ->
+        let score = events |> List.sumBy (fun event -> event.Score)
+        sourcedLogger.Information("Hand: {hand} | {cutCard} -> {name} scores {score}", cardsText hand, cardText cutCard, (if player = Player1 then computer1 else computer2), score)
+        events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text)))
+    engine.CribScoreEvent.Add(fun (player, crib, cutCard, events) ->
+        let score = events |> List.sumBy (fun event -> event.Score)
+        sourcedLogger.Information("Crib: {crib} | {cutCard} -> {name} scores {score}", cardsText crib, cardText cutCard, (if player = Player1 then computer1 else computer2), score)
+        events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))) *)
     use gamesCallback = engine.Games.AddCallback (gamesCallback computer1 computer2 games engine)
     use scoresCallback = engine.Scores.AddCallback (scoresCallback computer1 computer2)
     engine.Start()
