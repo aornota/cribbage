@@ -4,7 +4,7 @@ module Aornota.Cribbage.DevConsole.GamePlayer
 open Aornota.Cribbage.Common.Mathy
 open Aornota.Cribbage.Common.SourcedLogger
 open Aornota.Cribbage.Domain.Core
-open Aornota.Cribbage.Domain.Engine
+open Aornota.Cribbage.Domain.GameEngine
 open Aornota.Cribbage.Domain.Strategy
 
 open FSharp.Data.Adaptive
@@ -15,6 +15,7 @@ let [<Literal>] private SOURCE = "DevConsole.GamePlayer"
 
 let private sourcedLogger = sourcedLogger SOURCE Log.Logger
 
+let mutable private gameSummaries : GameSummary list = []
 let mutable private hasQuit = false
 
 let private validateGames games =
@@ -23,7 +24,25 @@ let private validateGames games =
 
 let private log (name1:string) (name2:string) (games:int<game>) = sourcedLogger.Information("{name1} vs. {name2} ({games} game/s)...", name1, name2, games)
 
-let private statistics (name:string) (statistics:(int<game> * float * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point>) option) =
+let private statistics player =
+    match gameSummaries with
+    | h :: t ->
+        let playerGameSummaries = h :: t |> List.map (fun summary -> (if player = Player1 then summary.Player1GameSummary else summary.Player2GameSummary), summary.IsWinner(player))
+        let games = playerGameSummaries.Length * 1<game>
+        let winPercentage = (float (playerGameSummaries |> List.filter (fun (_, won) -> won) |> List.length) / float games) * 100.0
+        let playerGameSummaries = playerGameSummaries |> List.map fst
+        let zero = { Total = 0<point> ; Count = 0 }
+        let peggingMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingMean)) zero
+        let peggingDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingDealerMean)) zero
+        let peggingNotDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingNotDealerMean)) zero
+        let handMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandMean)) zero
+        let handDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandDealerMean)) zero
+        let handNotDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandNotDealerMean)) zero
+        let cribMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.CribMean)) zero
+        Some (games, winPercentage, peggingMean, peggingDealerMean, peggingNotDealerMean, handMean, handDealerMean, handNotDealerMean, cribMean)
+    | [] -> None
+
+let private logStatistics (name:string) (statistics:(int<game> * float * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point>) option) =
     match statistics with
     | Some (games, winPercentage, peggingMean, peggingDealerMean, peggingNotDealerMean, handMean, handDealerMean, handNotDealerMean, cribMean) ->
         sourcedLogger.Information("Statistics for {name} ({games} game/s):", name, games)
@@ -33,12 +52,12 @@ let private statistics (name:string) (statistics:(int<game> * float * Mean<point
         sourcedLogger.Debug("\t\twhen dealer -> {mean}", Math.Round(float peggingDealerMean.Mean, 2))
         sourcedLogger.Debug("\t\twhen not dealer -> {mean}", Math.Round(float peggingNotDealerMean.Mean, 2)) *)
         sourcedLogger.Information("\tMean hand score -> {mean}", Math.Round(float handMean.Mean, 2))
-        sourcedLogger.Debug("\t\twhen dealer -> {mean}", Math.Round(float handDealerMean.Mean, 2))
-        sourcedLogger.Debug("\t\twhen not dealer -> {mean}", Math.Round(float handNotDealerMean.Mean, 2))
+        sourcedLogger.Information("\t\twhen dealer -> {mean}", Math.Round(float handDealerMean.Mean, 2))
+        sourcedLogger.Information("\t\twhen not dealer -> {mean}", Math.Round(float handNotDealerMean.Mean, 2))
         sourcedLogger.Information("\tMean crib score -> {mean}", Math.Round(float cribMean.Mean, 2))
     | None -> ()
 
-let private handleEvents (engine:Engine) (name1:string) (name2:string) =
+let private handleScoreEvents (engine:GameEngine) (name1:string) (name2:string) =
     engine.NibsScoreEvent.Add(fun (player, cutCard, event) ->
         sourcedLogger.Information("Cut: {cutCard} -> {player} scores {event}", cardText cutCard, (if player = Player1 then name1 else name2), event.Text))
     engine.HandScoreEvent.Add(fun (player, hand, cutCard, events) ->
@@ -50,14 +69,18 @@ let private handleEvents (engine:Engine) (name1:string) (name2:string) =
         sourcedLogger.Information("Crib: {crib} | {cutCard} -> {name} scores {score}", cardsText crib, cardText cutCard, (if player = Player1 then name1 else name2), score)
         events |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text)))
 
-let private gamesCallback (name1:string) (name2:string) games (engine:Engine) (games1, games2) =
-    let total = games1 + games2
-    if total > 0<game> then sourcedLogger.Information("...game finished -> {name1} {games1} - {games2} {name2}", name1, games1, games2, name2)
-    if total >= games then
-        engine.Quit(if games1 > games2 then Player2 else Player1)
-        hasQuit <- true
-        statistics name1 (engine.Statistics(Player1) |> AVal.force)
-        statistics name2 (engine.Statistics(Player2) |> AVal.force)
+let private handleGameOverEvent (engine:GameEngine) games (name1:string) (name2:string) =
+    engine.GameOverEvent.Add(fun gameSummary ->
+        gameSummaries <- gameSummary :: gameSummaries
+        let player1Games = gameSummaries |> List.sumBy (fun gameSummary -> if gameSummary.IsWinner(Player1) then 1 else 0)
+        let player2Games = gameSummaries |> List.sumBy (fun gameSummary -> if gameSummary.IsWinner(Player2) then 1 else 0)
+        sourcedLogger.Information("...game finished -> {name1} ({player1Score}) {player1Games} - {player2Games} ({player2Score}) {name2}",
+            name1, gameSummary.Player1Score, player1Games, player2Games, gameSummary.Player2Score, name2)
+        if gameSummaries.Length = int games then
+            engine.Quit(if player1Games > player2Games then Player2 else Player1)
+            logStatistics name1 (statistics Player1)
+            logStatistics name2 (statistics Player2)
+            hasQuit <- true)
 
 let private scoresCallback (name1:string) (name2:string) (score1, score2) = if score1 + score2 > 0<point> then sourcedLogger.Debug("...{name1} {score1} - {score2} {name2}", name1, score1, score2, name2)
 
@@ -76,41 +99,41 @@ let private randomStrategy : ForCribStrategy * PegStrategy = forCribRandom, pegR
 let better, basic, random = ("Better", betterStrategy), ("Basic", basicStrategy), ("Random", randomStrategy)
 let neph, jack = ("Neph", betterStrategy), ("Jack", basicStrategy)
 
-let computerVsComputer (computer1, strategy1) (computer2, strategy2) games =
+let computerVsComputer (computer1, strategy1) (computer2, strategy2) games = async {
     let games = validateGames games
     let computer1, computer2 = if computer1 = computer2 then sprintf "%s %i" computer1 1, sprintf "%s %i" computer2 2 else computer1, computer2
     log computer1 computer2 games
-    let engine = Engine(Computer (computer1, fst strategy1, snd strategy1), Computer (computer2, fst strategy2, snd strategy2))
+    let engine = GameEngine(Computer (computer1, fst strategy1, snd strategy1), Computer (computer2, fst strategy2, snd strategy2))
     (* TEMP-NMB...
-    handleEvents engine computer1 computer2 *)
-    use gamesCallback = engine.Games.AddCallback (gamesCallback computer1 computer2 games engine)
+    handleScoreEvents engine computer1 computer2 *)
+    handleGameOverEvent engine games computer1 computer2
     use scoresCallback = engine.Scores.AddCallback (scoresCallback computer1 computer2)
-    engine.Start()
+    while not hasQuit do do! Async.Sleep 250 }
 
-let humanVsComputer (human, strategy1:ForCribStrategy * PegStrategy) (computer, strategy2) games =
+let humanVsComputer (human, strategy1:ForCribStrategy * PegStrategy) (computer, strategy2) games = async {
     let games = validateGames games
     let human, computer = if human = computer then sprintf "%s %i" human 1, sprintf "%s %i" computer 2 else human, computer
     log human computer games
-    let engine = Engine(Human human, Computer (computer, fst strategy2, snd strategy2))
+    let engine = GameEngine(Human human, Computer (computer, fst strategy2, snd strategy2))
     (* TEMP-NMB...
-    handleEvents engine human computer *)
-    use gamesCallback = engine.Games.AddCallback (gamesCallback human computer games engine)
+    handleScoreEvents engine human computer *)
+    handleGameOverEvent engine games human computer
     use scoresCallback = engine.Scores.AddCallback (scoresCallback human computer)
     use awaitingForCrib1Callback = engine.AwaitingForCrib(Player1).AddCallback (awaitingForCribCallback (fst strategy1))
     // TODO-NMB...use awaitingPeg1Callback = engine.AwaitingPeg(Player1).AddCallback (awaitingPegCallback (snd strategy1))
     // TODO-NMB...use awaitingCannotPeg1Callback = engine.AwaitingCannotPeg(Player1).AddCallback awaitingCannotPegCallback
     use awaitingNewDeal1Callback = engine.AwaitingNewDeal(Player1).AddCallback awaitingNewDealCallback
     use awaitingNewGame1Callback = engine.AwaitingNewGame(Player1).AddCallback awaitingNewGameCallback
-    engine.Start()
+    while not hasQuit do do! Async.Sleep 250 }
 
-let humanVsHuman (human1, strategy1:ForCribStrategy * PegStrategy) (human2, strategy2:ForCribStrategy * PegStrategy) games =
+let humanVsHuman (human1, strategy1:ForCribStrategy * PegStrategy) (human2, strategy2:ForCribStrategy * PegStrategy) games = async {
     let games = validateGames games
     let human1, human2 = if human1 = human2 then sprintf "%s %i" human1 1, sprintf "%s %i" human2 2 else human1, human2
     log human1 human2 games
-    let engine = Engine(Human human1, Human human2)
+    let engine = GameEngine(Human human1, Human human2)
     (* TEMP-NMB...
-    handleEvents engine human1 human2 *)
-    use gamesCallback = engine.Games.AddCallback (gamesCallback human1 human2 games engine)
+    handleScoreEvents engine human1 human2 *)
+    handleGameOverEvent engine games human1 human2
     use scoresCallback = engine.Scores.AddCallback (scoresCallback human1 human2)
     use awaitingForCrib1Callback = engine.AwaitingForCrib(Player1).AddCallback (awaitingForCribCallback (fst strategy1))
     use awaitingForCrib2Callback = engine.AwaitingForCrib(Player2).AddCallback (awaitingForCribCallback (fst strategy2))
@@ -122,4 +145,4 @@ let humanVsHuman (human1, strategy1:ForCribStrategy * PegStrategy) (human2, stra
     use awaitingNewDeal1Callback = engine.AwaitingNewDeal(Player2).AddCallback awaitingNewDealCallback
     use awaitingNewGame1Callback = engine.AwaitingNewGame(Player1).AddCallback awaitingNewGameCallback
     use awaitingNewGame1Callback = engine.AwaitingNewGame(Player2).AddCallback awaitingNewGameCallback
-    engine.Start()
+    while not hasQuit do do! Async.Sleep 250 }
