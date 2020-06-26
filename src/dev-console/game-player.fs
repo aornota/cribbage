@@ -49,8 +49,8 @@ let private logStatistics (name:string) (statistics:(int<game> * float * Mean<po
         sourcedLogger.Information("\tWin percentage -> {percentage}%", Math.Round(winPercentage, 2))
         (* TODO-NMB: Once non-zero...
         sourcedLogger.Information("\tMean pegging score -> {mean}", Math.Round(float peggingMean.Mean, 2))
-        sourcedLogger.Debug("\t\twhen dealer -> {mean}", Math.Round(float peggingDealerMean.Mean, 2))
-        sourcedLogger.Debug("\t\twhen not dealer -> {mean}", Math.Round(float peggingNotDealerMean.Mean, 2)) *)
+        sourcedLogger.Information("\t\twhen dealer -> {mean}", Math.Round(float peggingDealerMean.Mean, 2))
+        sourcedLogger.Information("\t\twhen not dealer -> {mean}", Math.Round(float peggingNotDealerMean.Mean, 2)) *)
         sourcedLogger.Information("\tMean hand score -> {mean}", Math.Round(float handMean.Mean, 2))
         sourcedLogger.Information("\t\twhen dealer -> {mean}", Math.Round(float handDealerMean.Mean, 2))
         sourcedLogger.Information("\t\twhen not dealer -> {mean}", Math.Round(float handNotDealerMean.Mean, 2))
@@ -97,7 +97,7 @@ let private basicStrategy : ForCribStrategy * PegStrategy = forCribBasic, pegBas
 let private randomStrategy : ForCribStrategy * PegStrategy = forCribRandom, pegRandom
 
 let better, basic, random = ("Better", betterStrategy), ("Basic", basicStrategy), ("Random", randomStrategy)
-let neph, jack = ("Neph", betterStrategy), ("Jack", basicStrategy)
+let neph, jack = ("Neph", betterStrategy), ("Jack", betterStrategy)
 
 let computerVsComputer (computer1, strategy1) (computer2, strategy2) games = async {
     let games = validateGames games
@@ -142,7 +142,7 @@ let humanVsHuman (human1, strategy1:ForCribStrategy * PegStrategy) (human2, stra
     // TODO-NMB...use awaitingPeg2Callback = engine.AwaitingPeg(Player2).AddCallback (awaitingPegCallback (snd strategy2))
     // TODO-NMB...use awaitingCannotPeg2Callback = engine.AwaitingCannotPeg(Player2).AddCallback awaitingCannotPegCallback
     use awaitingNewDeal1Callback = engine.AwaitingNewDeal(Player1).AddCallback awaitingNewDealCallback
-    use awaitingNewDeal1Callback = engine.AwaitingNewDeal(Player2).AddCallback awaitingNewDealCallback
+    use awaitingNewDeal2Callback = engine.AwaitingNewDeal(Player2).AddCallback awaitingNewDealCallback
     use awaitingNewGame1Callback = engine.AwaitingNewGame(Player1).AddCallback awaitingNewGameCallback
-    use awaitingNewGame1Callback = engine.AwaitingNewGame(Player2).AddCallback awaitingNewGameCallback
+    use awaitingNewGame2Callback = engine.AwaitingNewGame(Player2).AddCallback awaitingNewGameCallback
     while not hasQuit do do! Async.Sleep 250 }
