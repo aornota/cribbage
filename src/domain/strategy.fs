@@ -68,7 +68,8 @@ let pegBasic (pegged:Pegged, peggable:Peggable) = // chooses highest-scoring car
         match peggable |> List.ofSeq |> List.choose (fun card -> if isSafeZone (pips (card :: pegged)) then Some card else None) with
         | h :: t -> Some (randomSingle (h :: t |> Set.ofList))
         | [] ->
-            let isDangerZone pips = pips = 5<pip> || pips = 10<pip> || pips = 21<pip> // TODO-NMB: Review this...
+            // TODO-NMB: Discourage making the score 10? But not as strongly as discouraging making the score 5?...
+            let isDangerZone pips = pips = 5<pip> || pips = 21<pip>
             match peggable |> List.ofSeq |> List.choose (fun card -> if isDangerZone (pips (card :: pegged)) then None else Some card) with
             | h :: t -> Some (randomSingle (h :: t |> Set.ofList))
             | [] -> pegNoneOrRandom peggable
