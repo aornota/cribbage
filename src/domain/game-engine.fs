@@ -502,7 +502,10 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
                     let currentDeal = gameState.Value.CurrentDeal
                     match currentDeal.PeggingState with
                     | Some peggingState ->
-                        if peggingState.Completed then inbox.Post ScoreNonDealerHand
+                        if peggingState.Completed then
+                            sourcedLogger.Debug("Pegging: {player} scored {score}", player1.Name, peggingState.Player1Score)
+                            sourcedLogger.Debug("Pegging: {player} scored {score}", player2.Name, peggingState.Player2Score)
+                            inbox.Post ScoreNonDealerHand
                         else
                             let toAct, canClaimGo, clearCurrent =
                                 let currentIsMax, currentIsEmpty = peggingState.CurrentPips = MAX_PEGGING, peggingState.CurrentPegging.Length = 0
