@@ -37,8 +37,9 @@ type PeggingScoreEvent =
         | Some card, _ ->
             if pegged |> List.contains card then raise (CardAlreadyPlayedException (sprintf "%s has already been played" (cardText card)))
             let rank, _ = card
-            let runningTotal = pips pegged + rank.PipValue
-            if runningTotal > MAX_PEGGING then raise (CannotPlayCardException (sprintf "Cannot play %s when running total is %i" (cardText card) (int runningTotal)))
+            let currentPips = pips pegged
+            if currentPips + rank.PipValue > MAX_PEGGING then raise (CannotPlayCardException (sprintf "Cannot play %s when running total is %i" (cardText card) (int currentPips)))
+            let runningTotal = currentPips + rank.PipValue
             let rec findRun (cards:CardL) =
                 match cards.Length with
                 | len when len > 3 ->

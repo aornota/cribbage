@@ -12,9 +12,9 @@ type IsSelf = bool
 type Pegged = (Card * IsSelf) list
 type Peggable = CardS
 
-// TODO-NMB: For advanced strategy, augment with subset of "game state" (e.g. scores | pegging "history")?...
+// TODO-NMB: For advanced strategies, augment with subset of "game state" (e.g. scores)?...
 type ForCribStrategy = IsDealer * Hand -> CardS
-type PegStrategy = Pegged * Peggable -> Card option
+type PegStrategy = Pegged * Peggable -> Card option // TODO-NMB: Augment with "previously pegged"?...
 
 let private partialCribScore (isDealer:IsDealer) (partialCrib:CardL) (cutCard:Card) =
     if partialCrib.Length <> 2 then raise (PartialCribDoesNotContain2CardsException (sprintf "Partial Crib (%s) does not contain 2 Cards" (cardsText (partialCrib |> Set.ofList))))
@@ -67,4 +67,8 @@ let pegBasic (pegged:Pegged, peggable:Peggable) = // chooses highest-scoring car
         let isSafeZone pips = pips < 5<pip> || (pips > 15<pip> && pips < 21<pip>)
         match peggable |> List.ofSeq |> List.choose (fun card -> if isSafeZone (pips (card :: pegged)) then Some card else None) with
         | h :: t -> Some (randomSingle (h :: t |> Set.ofList))
-        | [] -> pegNoneOrRandom peggable
+        | [] ->
+            let isDangerZone pips = pips = 5<pip> || pips = 21<pip>
+            match peggable |> List.ofSeq |> List.choose (fun card -> if isDangerZone (pips (card :: pegged)) then None else Some card) with
+            | h :: t -> Some (randomSingle (h :: t |> Set.ofList))
+            | [] -> pegNoneOrRandom peggable

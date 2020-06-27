@@ -19,9 +19,16 @@ exception HandDoesNotContain6CardsException
 exception GameNotFinishedException
 exception UnexpectedInitialInputException
 exception UnexpectedForCribInteractiveException of Player
+exception NoScoreForGoException
+exception UnexpectedPegException of Player
+exception UnexpectedPegInteractiveException of Player
+exception UnexpectedCannotPegInteractiveException of Player
+exception UnexpectedPeggingException
+exception InvalidCurrentPeggingException
 exception UnexpectedNewDealRequestException of Player
 exception UnexpectedNewGameRequestException of Player
 exception UnexpectedForCribForHumanPlayerException of Player
+exception UnexpectedPeggingForHumanPlayerException of Player
 exception AlreadyCutException
 exception NotCutException
 exception AlreadyScoredException
@@ -73,7 +80,7 @@ type private Input =
     | Interactive of Interactive
     | ForCribNonInteractive of Player
     | Cut
-    | Pegging // TODO-NMB: More pegging?...
+    | Pegging
     | ScoreNonDealerHand
     | ScoreDealerHand
     | ScoreCrib
@@ -81,7 +88,43 @@ type private Input =
     | ProcessGame
     | NewGame
 
-// TODO-NMB: PeggingState...
+type private PeggingState = {
+    Player1Hand : Hand
+    Player2Hand : Hand
+    Player1Knocked : bool
+    Player2Knocked : bool
+    Player1Score : int<point>
+    Player2Score : int<point>
+    CurrentPegging : (Card * Player) list
+    PreviousPegging : ((Card * Player) list) list }
+    with
+    member this.CurrentPips = pips (this.CurrentPegging |> List.map fst)
+    member this.Play(player, card, score) =
+        let newHand current = function | Some card -> removeFromHand (current, Set.singleton card) | None -> current
+        let newScore current = function | Some score -> current + score | None -> current
+        match card with
+        | Some (card:Card) ->
+            let currentPips = this.CurrentPips
+            if currentPips + (fst card).PipValue > MAX_PEGGING then raise (CannotPlayCardException (sprintf "Cannot play %s when running total is %i" (cardText card) (int currentPips)))
+        | None -> ()
+        let isKnock, currentPegging = match card with | Some card -> false, (card, player) :: this.CurrentPegging | None -> true, this.CurrentPegging
+        if player = Player1 then
+            { this with
+                Player1Hand = newHand this.Player1Hand card
+                Player1Knocked = isKnock
+                Player1Score = newScore this.Player1Score score
+                CurrentPegging = currentPegging }
+        else
+            { this with
+                Player2Hand = newHand this.Player2Hand card
+                Player2Knocked = isKnock
+                Player2Score = newScore this.Player2Score score
+                CurrentPegging = currentPegging }
+    member this.Pegged(player) : (Card * IsSelf) list = this.CurrentPegging |> List.map (fun (card, player') -> card, player' = player)
+    member this.Peggable(player) : CardS =
+        (if player = Player1 then this.Player1Hand else this.Player2Hand)
+        |> Set.filter (fun (rank, _) -> pips (this.CurrentPegging |> List.map fst) + rank.PipValue <= MAX_PEGGING)
+    member this.Completed = this.Player1Hand.Count = 0 && this.Player2Hand.Count = 0 && this.Player1Knocked && this.Player2Knocked
 
 type private CurrentDeal = {
     Dealer : Player
@@ -91,19 +134,22 @@ type private CurrentDeal = {
     Crib : Crib
     CutCard : Card option
     NibsScore : int<point> option
-    // TODO-NMB: PeggingState (and scores)...
+    PeggingState : PeggingState option
     DealerHandScore : int<point> option
     NonDealerHandScore : int<point> option
     CribScore : int<point> option }
     with
-    member this.IsDealer(player) = this.Dealer = player
+    member this.IsDealer(player) : IsDealer = this.Dealer = player
     member this.Hand(player) = if this.IsDealer(player) then this.DealerHand else this.NonDealerHand
     member this.UpdateHand(player, hand, crib) = if this.IsDealer(player) then { this with DealerHand = hand ; Crib = crib } else { this with NonDealerHand = hand; Crib = crib }
     member this.Score(player) =
         let defaultValue score = score |> Option.defaultValue 0<point>
-        // TODO-NMB: Pegging scores...
-        if this.IsDealer(player) then defaultValue this.NibsScore + defaultValue this.DealerHandScore + defaultValue this.CribScore
-        else defaultValue this.NonDealerHandScore
+        let peggingScore =
+            match this.PeggingState with
+            | Some peggingState -> Some (if player = Player1 then peggingState.Player1Score else peggingState.Player2Score)
+            | None -> None
+        if this.IsDealer(player) then defaultValue this.NibsScore + defaultValue peggingScore + defaultValue this.DealerHandScore + defaultValue this.CribScore
+        else defaultValue peggingScore + defaultValue this.NonDealerHandScore
 
 type Completed = bool
 
@@ -167,6 +213,7 @@ type PlayerGameSummary = {
     member this.HandMean = Mean<_>.Combine(this.HandDealerMean, this.HandNotDealerMean)
 
 type GameSummary = {
+    Deals : int
     Player1GameSummary : PlayerGameSummary
     Player2GameSummary : PlayerGameSummary }
     with
@@ -174,6 +221,7 @@ type GameSummary = {
         let player1Score, player2Score = deals |> List.sumBy (fun deal -> deal.Player1Score), deals |> List.sumBy (fun deal -> deal.Player2Score)
         if player1Score < GAME_TARGET && player2Score < GAME_TARGET then raise GameNotFinishedException
         {
+            Deals = deals.Length
             Player1GameSummary = PlayerGameSummary.FromPlayerDealSummaries(deals |> List.map (fun deal -> deal.Player1DealSummary))
             Player2GameSummary = PlayerGameSummary.FromPlayerDealSummaries(deals |> List.map (fun deal -> deal.Player2DealSummary))
         }
@@ -213,7 +261,7 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
             Crib = Set.empty
             CutCard = None
             NibsScore = None
-            // TODO-NMB: PeggingState (and scores)...
+            PeggingState = None
             DealerHandScore = None
             NonDealerHandScore = None
             CribScore = None
@@ -226,13 +274,21 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
             CurrentDeal = newDeal dealer
         }
     let gameState = cval (newGame (if normalizedRandom () < 0.5 then Player1 else Player2))
-    let awaitingForCribPlayer1 : cval<(bool * Hand) option> = cval None
-    let awaitingForCribPlayer2 : cval<(bool * Hand) option> = cval None
-    // TODO-NMB: awaitingPegPlayer[1|2] | awaitingCannotPegPlayer[1|2] | ...
+    let awaitingForCribPlayer1 : cval<(IsDealer * Hand) option> = cval None
+    let awaitingForCribPlayer2 : cval<(IsDealer * Hand) option> = cval None
+    let awaitingPegPlayer1 : cval<(Pegged * Peggable) option> = cval None
+    let awaitingPegPlayer2 : cval<(Pegged * Peggable) option> = cval None
+    let awaitingCannotPegPlayer1 = cval false
+    let awaitingCannotPegPlayer2 = cval false
     let awaitingNewDealPlayer1 = cval false
     let awaitingNewDealPlayer2 = cval false
     let awaitingNewGamePlayer1 = cval false
     let awaitingNewGamePlayer2 = cval false
+    let nibsScoreEvent = new Event<Player * Card * NibsScoreEvent>()
+    let peggingScoreEvent = new Event<Player * Card option * CardL * PeggingScoreEvent list>()
+    let handScoreEvent = new Event<Player * Hand * Card * HandScoreEvent list>()
+    let cribScoreEvent = new Event<Player * Crib * Card * CribScoreEvent list>()
+    let gameOverEvent = new Event<GameSummary> ()
     let forCribNonInteractive () =
         let currentDeal = gameState.Value.CurrentDeal
         if not player1IsInteractive && (currentDeal.Hand(Player1)).Count = DEALT_HAND_COUNT then Some (ForCribNonInteractive Player1)
@@ -246,7 +302,7 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
             | None ->
                 let hand = currentDeal.Hand(Player1)
                 if hand.Count = DEALT_HAND_COUNT then
-                    sourcedLogger.Debug("Awaiting cards for crib from {player}...", (toPlayerDetails Player1).Name)
+                    sourcedLogger.Debug("Awaiting cards for crib from {player}...", player1.Name)
                     transact (fun _ -> awaitingForCribPlayer1.Value <- Some (currentDeal.IsDealer(Player1), hand))
         else if player2IsInteractive then
             match awaitingForCribPlayer2.Value with
@@ -254,7 +310,7 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
             | None ->
                 let hand = currentDeal.Hand(Player2)
                 if hand.Count = DEALT_HAND_COUNT then
-                    sourcedLogger.Debug("Awaiting cards for crib from {player}...", (toPlayerDetails Player2).Name)
+                    sourcedLogger.Debug("Awaiting cards for crib from {player}...", player2.Name)
                     transact (fun _ -> awaitingForCribPlayer2.Value <- Some (currentDeal.IsDealer(Player2), hand))
     let handToCrib (currentDeal:CurrentDeal) player forCrib =
         let hand = currentDeal.Hand(player)
@@ -262,31 +318,59 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
         let hand, crib = removeFromHand (hand, forCrib), addToCrib (currentDeal.Crib, forCrib)
         sourcedLogger.Debug("...{player} adds {forCrib} to crib -> hand is {hand}", (toPlayerDetails player).Name, cardsText forCrib, cardsText hand)
         hand, crib
+    let peg (peggingState:PeggingState option) player card =
+        match peggingState with
+        | Some peggingState ->
+            let pegged = peggingState.CurrentPegging |> List.rev |> List.map fst
+            let previous = match pegged |> List.map cardText with | h :: t -> sprintf "(%s) " (h :: t |> String.concat " ") | [] -> ""
+            let played, runningTotal =
+                match card with
+                | Some card -> Some (cardText card), peggingState.CurrentPips + (fst card).PipValue
+                | None -> None, peggingState.CurrentPips
+            let score =
+                match PeggingScoreEvent.Play(peggingState.CurrentPegging |> List.map fst, card) with
+                | h :: t ->
+                    let score = h :: t |> List.sumBy (fun event -> event.Score)
+                    match played with
+                    | Some played -> sourcedLogger.Debug("...{player} plays {previous}{played} = {runningTotal} -> scores {score}", (toPlayerDetails player).Name, previous, played, runningTotal, score)
+                    | None -> sourcedLogger.Debug("...{player} claims a go -> scores {score}", (toPlayerDetails player).Name, score)
+                    h :: t |> List.iter (fun event -> sourcedLogger.Debug("\t{event}", event.Text))
+                    peggingScoreEvent.Trigger(player, card, pegged, h :: t)
+                    Some score
+                | [] ->
+                    match played with
+                    | Some played -> sourcedLogger.Debug("...{player} plays {previous}{played} = {runningTotal}", (toPlayerDetails player).Name, previous, played, runningTotal)
+                    | None -> raise NoScoreForGoException
+                    None
+            let peggingState = peggingState.Play(player, card, score)
+            let hand = if player = Player1 then peggingState.Player1Hand else peggingState.Player2Hand
+            if hand.Count > 0 then sourcedLogger.Debug("...{player} now has {cards}", (toPlayerDetails player).Name, cardsText hand)
+            peggingState
+        | None -> raise (UnexpectedPegException player)
     let dealSummary (currentDeal:CurrentDeal) =
+        let peggingScore player =
+            match currentDeal.PeggingState with
+            | Some peggingState ->
+                let score, hand = if player = Player1 then peggingState.Player1Score, peggingState.Player1Hand else peggingState.Player2Score, peggingState.Player2Hand
+                Some (score, hand.Count = 0)
+            | None -> None
         let player1WasDealer = currentDeal.IsDealer(Player1)
         let player1DealSummary = {
             WasDealer = player1WasDealer
             NibsScore = if player1WasDealer then currentDeal.NibsScore else None
-            // TODO-NMB: Calculate PeggingScore correctly...
-            PeggingScore = Some (0<point>, true) // TEMP-NMB: Not None (else error in PlayerGameSummary.FromPlayerDealSummaries(...))...
+            PeggingScore = peggingScore Player1
             HandScore = if player1WasDealer then currentDeal.DealerHandScore else currentDeal.NonDealerHandScore
             CribScore = if player1WasDealer then currentDeal.CribScore else None }
         let player2DealSummary = {
             WasDealer = not player1WasDealer
             NibsScore = if not player1WasDealer then currentDeal.NibsScore else None
-            // TODO-NMB: Calculate PeggingScore correctly...
-            PeggingScore = Some (0<point>, true) // TEMP-NMB: Not None (else error in PlayerGameSummary.FromPlayerDealSummaries(...))...
+            PeggingScore = peggingScore Player2
             HandScore = if not player1WasDealer then currentDeal.DealerHandScore else currentDeal.NonDealerHandScore
             CribScore = if not player1WasDealer then currentDeal.CribScore else None }
         {
             Player1DealSummary = player1DealSummary
             Player2DealSummary = player2DealSummary
         }
-    let nibsScoreEvent = new Event<Player * Card * NibsScoreEvent>()
-    // TODO-NMB: Pegging event/s...
-    let handScoreEvent = new Event<Player * Hand * Card * HandScoreEvent list>()
-    let cribScoreEvent = new Event<Player * Crib * Card * CribScoreEvent list>()
-    let gameOverEvent = new Event<GameSummary> ()
     let agent = MailboxProcessor<_>.Start(fun inbox ->
         let rec loop (initialInput:Input option) = async {
             match initialInput with
@@ -307,20 +391,27 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
             | Some _ -> raise UnexpectedInitialInputException
             | None ->
                 match awaitingForCribPlayer1.Value with
-                | Some _ -> sourcedLogger.Debug("Awaiting cards for crib from {player}...", (toPlayerDetails Player1).Name)
+                | Some _ -> sourcedLogger.Debug("Awaiting cards for crib from {player}...", player1.Name)
                 | None -> awaitingForCribInteractive Player1
                 match awaitingForCribPlayer2.Value with
-                | Some _ -> sourcedLogger.Debug("Awaiting cards for crib from {player}...", (toPlayerDetails Player2).Name)
+                | Some _ -> sourcedLogger.Debug("Awaiting cards for crib from {player}...", player2.Name)
                 | None -> awaitingForCribInteractive Player2
-                // TODO-NMB: awaitingPegPlayer[1|2] | awaitingCannotPegPlayer[1|2] | ...
-                if awaitingNewDealPlayer1.Value then sourcedLogger.Debug("Awaiting new deal request from {player}...", (toPlayerDetails Player1).Name)
-                if awaitingNewDealPlayer2.Value then sourcedLogger.Debug("Awaiting new deal request from {player}...", (toPlayerDetails Player2).Name)
-                if awaitingNewGamePlayer1.Value then sourcedLogger.Debug("Awaiting new game request from {player}...", (toPlayerDetails Player1).Name)
-                if awaitingNewGamePlayer2.Value then sourcedLogger.Debug("Awaiting new game request from {player}...", (toPlayerDetails Player2).Name)
+                match awaitingPegPlayer1.Value with
+                | Some (_, peggable) -> sourcedLogger.Debug("Awaiting {cardOrGo} from {player}...", (if peggable.Count > 0 then "pegging card" else "go"), player1.Name)
+                | None -> ()
+                match awaitingPegPlayer2.Value with
+                | Some (_, peggable) -> sourcedLogger.Debug("Awaiting {cardOrGo} from {player}...", (if peggable.Count > 0 then "pegging card" else "go"), player2.Name)
+                | None -> ()
+                if awaitingCannotPegPlayer1.Value then sourcedLogger.Debug("Awaiting cannot peg from {player}...", player1.Name)
+                if awaitingCannotPegPlayer2.Value then sourcedLogger.Debug("Awaiting cannot peg from {player}...", player2.Name)
+                if awaitingNewDealPlayer1.Value then sourcedLogger.Debug("Awaiting new deal request from {player}...", player1.Name)
+                if awaitingNewDealPlayer2.Value then sourcedLogger.Debug("Awaiting new deal request from {player}...", player2.Name)
+                if awaitingNewGamePlayer1.Value then sourcedLogger.Debug("Awaiting new game request from {player}...", player1.Name)
+                if awaitingNewGamePlayer2.Value then sourcedLogger.Debug("Awaiting new game request from {player}...", player2.Name)
                 match! inbox.Receive() with
                 | Interactive (ForCrib (player, forCrib)) ->
-                    let currentDeal = gameState.Value.CurrentDeal
                     if (if player = Player1 then awaitingForCribPlayer1 else awaitingForCribPlayer2).Value |> Option.isNone then raise (UnexpectedForCribInteractiveException player)
+                    let currentDeal = gameState.Value.CurrentDeal
                     let hand, crib = handToCrib currentDeal player forCrib
                     transact (fun _ ->
                         gameState.Value <- { gameState.Value with CurrentDeal = currentDeal.UpdateHand(player, hand, crib) }
@@ -328,11 +419,27 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
                     if gameState.Value.ReadyForCut then inbox.Post Cut
                     return! loop None
                 | Interactive (Peg (player, card)) ->
-                    // TODO-NMB...
+                    if (if player = Player1 then awaitingPegPlayer1 else awaitingPegPlayer2).Value |> Option.isNone then raise (UnexpectedPegInteractiveException player)
+                    let currentDeal = gameState.Value.CurrentDeal
+                    transact (fun _ ->
+                        gameState.Value <- { gameState.Value with CurrentDeal = { currentDeal with PeggingState = Some (peg currentDeal.PeggingState player card) } }
+                        (if player = Player1 then awaitingPegPlayer1 else awaitingPegPlayer2).Value <- None)
+                    if gameState.Value.GameOver then inbox.Post ProcessGame
+                    else inbox.Post Pegging
                     return! loop None
                 | Interactive (CannotPeg player) ->
-                    // TODO-NMB...
-                    return! loop None
+                    if not (if player = Player1 then awaitingCannotPegPlayer1 else awaitingCannotPegPlayer2).Value then raise (UnexpectedCannotPegInteractiveException player)
+                    let currentDeal = gameState.Value.CurrentDeal
+                    match currentDeal.PeggingState with
+                    | Some peggingState ->
+                        sourcedLogger.Debug("...{player} cannot peg", (toPlayerDetails player).Name)
+                        let peggingState = if player = Player1 then { peggingState with Player1Knocked = true } else { peggingState with Player2Knocked = true }
+                        transact (fun _ ->
+                            gameState.Value <- { gameState.Value with CurrentDeal = { currentDeal with PeggingState = Some peggingState} }
+                            (if player = Player1 then awaitingCannotPegPlayer1 else awaitingCannotPegPlayer2).Value <- false)
+                        inbox.Post Pegging
+                        return! loop None
+                    | None -> raise (UnexpectedCannotPegInteractiveException player)
                 | Interactive (RequestNewDeal player) ->
                     if not (if player = Player1 then awaitingNewDealPlayer1 else awaitingNewDealPlayer2).Value then raise (UnexpectedNewDealRequestException player)
                     sourcedLogger.Debug("...new deal requested by {name}", (toPlayerDetails player).Name)
@@ -378,12 +485,87 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
                     transact (fun _ -> gameState.Value <- { gameState.Value with CurrentDeal = { currentDeal with Deck = deck ; CutCard = Some cutCard } })
                     if gameState.Value.GameOver then inbox.Post ProcessGame
                     else
-                        // TODO-NMB: Start pegging "loop"...
-                        inbox.Post ScoreNonDealerHand // TEMP-NMB...
+                        let currentDeal = gameState.Value.CurrentDeal
+                        let peggingState = {
+                            Player1Hand = currentDeal.Hand(Player1)
+                            Player2Hand = currentDeal.Hand(Player2)
+                            Player1Knocked = false
+                            Player2Knocked = false
+                            Player1Score = 0<point>
+                            Player2Score = 0<point>
+                            CurrentPegging = []
+                            PreviousPegging = [] }
+                        transact (fun _ -> gameState.Value <- { gameState.Value with CurrentDeal = { currentDeal with PeggingState = Some peggingState } })
+                        inbox.Post Pegging
                     return! loop None
                 | Pegging ->
-                    // TODO-NMB...
-                    return! loop None // TEMP-NMB...
+                    let currentDeal = gameState.Value.CurrentDeal
+                    match currentDeal.PeggingState with
+                    | Some peggingState ->
+                        if peggingState.Completed then inbox.Post ScoreNonDealerHand
+                        else
+                            let toAct, canClaimGo, clearCurrent =
+                                let currentIsMax, currentIsEmpty = peggingState.CurrentPips = MAX_PEGGING, peggingState.CurrentPegging.Length = 0
+                                match peggingState.Player1Knocked, peggingState.Player2Knocked with
+                                | true, true ->
+                                    let toAct =
+                                        match peggingState.CurrentPegging with
+                                        | (_, player) :: _ -> otherPlayer player
+                                        | [] -> raise InvalidCurrentPeggingException
+                                    toAct, false, true
+                                | true, false -> Player2, not (currentIsMax || currentIsEmpty), currentIsMax
+                                | false, true -> Player1, not (currentIsMax || currentIsEmpty), currentIsMax
+                                | false, false ->
+                                    let toAct =
+                                        match peggingState.CurrentPegging with
+                                        | (_, player) :: _ -> otherPlayer player
+                                        | [] -> otherPlayer currentDeal.Dealer
+                                    toAct, false, currentIsMax
+                            let peggingState =
+                                if clearCurrent then
+                                    { peggingState with
+                                        Player1Knocked = false
+                                        Player2Knocked = false
+                                        CurrentPegging = []
+                                        PreviousPegging = peggingState.CurrentPegging :: peggingState.PreviousPegging }
+                                else peggingState
+                            let peggingState, awaiting =
+                                match toAct with
+                                | Player1 when peggingState.Player1Hand.Count = 0 && not peggingState.Player2Knocked ->
+                                    sourcedLogger.Debug("...{player} has no more cards to peg", player1.Name)
+                                    { peggingState with Player1Knocked = true }, None
+                                | Player2 when peggingState.Player2Hand.Count = 0 && not peggingState.Player1Knocked ->
+                                    sourcedLogger.Debug("...{player} has no more cards to peg", player2.Name)
+                                    { peggingState with Player2Knocked = true }, None
+                                | player ->
+                                    let hand = if player = Player1 then peggingState.Player1Hand else peggingState.Player2Hand
+                                    if hand.Count = 0 then sourcedLogger.Debug("...{player} has no more cards to peg", (toPlayerDetails player).Name)
+                                    let peggable = peggingState.Peggable(player)
+                                    let canPeg, isInteractive = peggable.Count > 0 || canClaimGo, if player = Player1 then player1IsInteractive else player2IsInteractive
+                                    match isInteractive, canPeg with
+                                    | true, true ->
+                                        peggingState, Some (fun () -> (if player = Player1 then awaitingPegPlayer1 else awaitingPegPlayer2).Value <- Some (peggingState.Pegged(player), peggable))
+                                    | true, false -> peggingState, Some (fun () -> (if player = Player1 then awaitingCannotPegPlayer1 else awaitingCannotPegPlayer2).Value <- true)
+                                    | false, true ->
+                                        match toPlayerDetails player with
+                                        | Human _ -> raise (UnexpectedPeggingForHumanPlayerException player)
+                                        | Computer (name, _, pegStrategy) ->
+                                            sourcedLogger.Debug("Choosing {cardOrGo} from {player}...", (if peggable.Count > 0 then "pegging card" else "go"), name)
+                                            let card = pegStrategy (peggingState.Pegged(player), peggable)
+                                            peg (Some peggingState) player card, None
+                                    | false, false ->
+                                        match toPlayerDetails player with
+                                        | Human _ -> raise (UnexpectedPeggingForHumanPlayerException player)
+                                        | Computer (name, _, pegStrategy) ->
+                                            sourcedLogger.Debug("...{player} cannot peg", name)
+                                            (if player = Player1 then { peggingState with Player1Knocked = true } else { peggingState with Player2Knocked = true }), None
+                            transact (fun _ ->
+                                gameState.Value <- { gameState.Value with CurrentDeal = { currentDeal with PeggingState = Some peggingState } }
+                                match awaiting with | Some awaiting -> awaiting () | None -> ())
+                            if gameState.Value.GameOver then inbox.Post ProcessGame
+                            else if awaiting |> Option.isNone then inbox.Post Pegging
+                        return! loop None
+                    | None -> raise UnexpectedPeggingException
                 | ScoreNonDealerHand ->
                     let currentDeal = gameState.Value.CurrentDeal
                     let currentDeal =
@@ -467,14 +649,22 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
     member _.Players = player1, player2
     member _.Scores = gameState |> AVal.map (fun gameState -> gameState.Scores)
     member _.Dealer = gameState |> AVal.map (fun gameState -> gameState.CurrentDeal.Dealer)
+    member _.CutCard = gameState |> AVal.map (fun gameState -> gameState.CurrentDeal.CutCard)
     member _.AwaitingForCrib(player) =
         (if player = Player1 then awaitingForCribPlayer1 else awaitingForCribPlayer2)
         |> AVal.map (fun awaiting ->
             match awaiting with
             | Some (isDealer, hand) -> Some (isDealer, hand, fun forCrib -> agent.Post(Interactive (ForCrib (player, forCrib))))
             | None -> None)
-    member _.CutCard = gameState |> AVal.map (fun gameState -> gameState.CurrentDeal.CutCard)
-    // TODO-NMB: AwaitingPegPlayer[1|2] (return (Pagged * Peggable * (Card option -> unit)) option) | AwaitingCannotPegPlayer[1|2] | ...
+    member _.AwaitingPeg(player) =
+        (if player = Player1 then awaitingPegPlayer1 else awaitingPegPlayer2)
+        |> AVal.map (fun awaiting ->
+            match awaiting with
+            | Some (pegged, peggable) -> Some (pegged, peggable, fun card -> agent.Post(Interactive (Peg (player, card))))
+            | None -> None)
+    member _.AwaitingCannotPeg(player) =
+        (if player = Player1 then awaitingCannotPegPlayer1 else awaitingCannotPegPlayer2)
+        |> AVal.map (fun awaiting -> if awaiting then Some (fun () -> agent.Post(Interactive (CannotPeg player))) else None)
     member _.AwaitingNewDeal(player) =
         (if player = Player1 then awaitingNewDealPlayer1 else awaitingNewDealPlayer2)
         |> AVal.map (fun awaiting -> if awaiting then Some (fun () -> agent.Post(Interactive (RequestNewDeal player))) else None)
@@ -483,7 +673,7 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
         |> AVal.map (fun awaiting -> if awaiting then Some (fun () -> agent.Post(Interactive (RequestNewGame player))) else None)
     member _.Quit(player) = agent.Post(Interactive (Quit player))
     member _.NibsScoreEvent = nibsScoreEvent.Publish
-    // TODO-NMB: Pegging event/s...
+    member _.PeggingScoreEvent = peggingScoreEvent.Publish
     member _.HandScoreEvent = handScoreEvent.Publish
     member _.CribScoreEvent = cribScoreEvent.Publish
     member _.GameOverEvent = gameOverEvent.Publish
