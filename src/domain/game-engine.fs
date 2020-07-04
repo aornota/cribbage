@@ -530,8 +530,8 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
                                         | (_, player) :: _ -> otherPlayer player
                                         | [] -> raise InvalidCurrentPeggingException
                                     toAct, false, true
-                                | true, false -> Player2, not (currentIsMax || currentIsEmpty), currentIsMax
-                                | false, true -> Player1, not (currentIsMax || currentIsEmpty), currentIsMax
+                                | true, false -> (if currentIsMax then Player1 else Player2), not (currentIsMax || currentIsEmpty), currentIsMax
+                                | false, true -> (if currentIsMax then Player2 else Player1), not (currentIsMax || currentIsEmpty), currentIsMax
                                 | false, false ->
                                     let toAct =
                                         match peggingState.CurrentPegging with

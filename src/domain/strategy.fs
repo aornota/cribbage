@@ -35,7 +35,8 @@ let private partialCribScore (isDealer:IsDealer) (partialCrib:CardL) (cutCard:Ca
     let runScore = if distinctRanks = 3 then match isRun all with | Some _ -> 3 | None -> 0 else 0
     (fifteensScore + pairsScore + runScore) * (if isDealer then 1<point> else -1<point>)
 
-let private forCrib adjustForPartialCribScore (isDealer:IsDealer, dealt:Hand) : CardS = // chooses 2-card combination with highest mean hand score (adjusted by "partial crib" score) for all possible cut cards
+// Chooses 2-card combination with highest mean hand score - optionally adjusted by "partial crib" score - for all possible cut cards.
+let private forCrib adjustForPartialCribScore (isDealer:IsDealer, dealt:Hand) : CardS =
     let cutCards = deckExcept dealt
     let combo, _ =
         combinations [] 2 (dealt |> List.ofSeq)
@@ -59,17 +60,18 @@ let private pegNoneOnlyOrRandom (peggable:CardS) = if peggable.Count = 0 then No
 
 let pegRandom (pegState:PegState) = pegNoneOnlyOrRandom pegState.Peggable
 
-let pegBasic (pegState:PegState) = // chooses highest-scoring card, else random "safe zone", else random "not danger zone", else random
-    let pegged = pegState.Pegged |> List.map fst
+// Chooses highest-scoring card, else random "safe zone", else random "not danger zone", else random.
+let pegBasic (pegState:PegState) =
     let peggable = pegState.Peggable
     match peggable.Count with
     | 0 | 1 -> pegNoneOnlyOrRandom peggable
     | _ ->
+        let pegged = pegState.Pegged |> List.map fst
         let highestScoring =
             let scoring =
                 peggable
                 |> List.ofSeq
-                |> List.choose (fun card -> match PeggingScoreEvent.Play(pegged, Some card) with | h :: t -> Some(card, h :: t |> List.sumBy (fun event -> event.Score)) | [] -> None)
+                |> List.choose (fun card -> match PeggingScoreEvent.Play(pegged, Some card) with | h :: t -> Some (card, h :: t |> List.sumBy (fun event -> event.Score)) | [] -> None)
             match scoring with
             | h :: t ->
                 let max = h :: t |> List.map snd |> List.max
@@ -87,6 +89,42 @@ let pegBasic (pegState:PegState) = // chooses highest-scoring card, else random 
                 | h :: t -> Some (randomSingle (h :: t |> Set.ofList))
                 | [] -> pegNoneOnlyOrRandom peggable
 
-// TODO-NMB: pegIntermediate, i.e. similar to pegBasic - but adjusted for oppenent-next-peg score?...
+// Chooses highest-scoring card (adjusted by mean "opponent next card" score).
+let pegIntermediate (pegState:PegState) =
+    let previouslyPegged, pegged, peggable = pegState.PreviouslyPegged, pegState.Pegged, pegState.Peggable
+    match peggable.Count with
+    | 0 | 1 -> pegNoneOnlyOrRandom peggable
+    | _ ->
+        let allPegged = (previouslyPegged |> List.collect id) @ pegged
+        let known = pegState.CutCard :: (allPegged |> List.map fst) @ (peggable |> List.ofSeq) @ (pegState.NotPeggable |> List.ofSeq) @ (pegState.SelfCrib |> List.ofSeq)
+        let unknown = deckExcept (known |> Set.ofList)
+        let opponentCouldHave =
+            match previouslyPegged with
+            | h :: t ->
+                let highestTotal = h :: t |> List.map (fun pegged -> pegged |> List.map fst |> pips) |> List.max
+                let lowestPossible = (MAX_PEGGING - highestTotal) + 1<pip>
+                unknown |> Set.filter (fun (rank, _) -> rank.PipValue >= lowestPossible)
+            | [] -> unknown
+        let opponentHasCards = (allPegged |> List.filter (snd >> not)).Length < 4
+        let opponentHasKnocked = match pegState.Pegged with | (_, true) :: _ -> true | _ -> false
+        let pegged = pegged |> List.map fst
+        let adjustedScores =
+            peggable
+            |> List.ofSeq
+            |> List.map (fun card ->
+                let selfScore = PeggingScoreEvent.Play(pegged, Some card) |> List.sumBy (fun event -> event.Score)
+                let opponentNextScore =
+                    if not opponentHasCards || opponentHasKnocked || pips (card :: pegged) = MAX_PEGGING then 0.0
+                    else
+                        let pegged = card :: pegged
+                        let pips = pips pegged
+                        opponentCouldHave
+                        |> List.ofSeq
+                        |> List.averageBy (fun (rank, suit) ->
+                            if rank.PipValue + pips <= MAX_PEGGING then float (PeggingScoreEvent.Play(pegged, Some (rank, suit)) |> List.sumBy (fun event -> event.Score))
+                            else 0.0)
+                card, (float selfScore) - opponentNextScore)
+        let (card, _) = adjustedScores |> List.maxBy snd
+        Some card
 
 // TODO-NMB: pegAdvanced, i.e. similar to pegIntermediate - but using opponent-hand-rank-frequency heuristics?...

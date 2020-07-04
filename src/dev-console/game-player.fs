@@ -106,12 +106,13 @@ let private awaitingCannotPegCallback = function | Some cannotPeg -> cannotPeg (
 let private awaitingNewDealCallback = function | Some newDeal -> newDeal () | None -> ()
 let private awaitingNewGameCallback = function | Some newGame -> (if not hasQuit then newGame () else ()) | None -> ()
 
-let private intermediateStrategy : ForCribStrategy * PegStrategy = forCribIntermediate, pegBasic
+// TODO-NMB: advancedStategy?...
+let private intermediateStrategy : ForCribStrategy * PegStrategy = forCribIntermediate, pegIntermediate
 let private basicStrategy : ForCribStrategy * PegStrategy = forCribBasic, pegBasic
 let private randomStrategy : ForCribStrategy * PegStrategy = forCribRandom, pegRandom
 
 let intermediate, basic, random = ("Intermediate", intermediateStrategy), ("Basic", basicStrategy), ("Random", randomStrategy)
-let neph, jack = ("Neph", intermediateStrategy), ("Jack", intermediateStrategy)
+let neph, jack = ("Neph", intermediateStrategy), ("Jack", basicStrategy)
 
 let computerVsComputer (computer1, strategy1) (computer2, strategy2) games = async {
     let games = validateGames games
