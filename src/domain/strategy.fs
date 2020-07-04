@@ -20,7 +20,8 @@ type PegState = {
     Peggable : CardS
     NotPeggable : CardS
     CutCard : Card
-    SelfCrib : CardS }
+    SelfCrib : CardS
+    IsDealer : IsDealer }
 
 type PegStrategy = PegState -> Card option
 

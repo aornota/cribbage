@@ -3,11 +3,13 @@ module Aornota.Cribbage.DevConsole.Program
 open Aornota.Cribbage.Common.Console
 open Aornota.Cribbage.Common.IfDebug
 open Aornota.Cribbage.Common.SourcedLogger
+open Aornota.Cribbage.Domain.Strategy
 
 open Giraffe.SerilogExtensions
 open Microsoft.Extensions.Configuration
 open Serilog
 open System
+open System.IO
 
 let [<Literal>] private SOURCE = "DevConsole.Program"
 
@@ -25,6 +27,8 @@ do Log.Logger <- LoggerConfiguration().ReadFrom.Configuration(configuration).Des
 
 let private sourcedLogger = sourcedLogger SOURCE Log.Logger
 
+let rec private findSrcDir (currentDir:DirectoryInfo) = if currentDir.Name = "src" then currentDir.FullName else findSrcDir currentDir.Parent
+
 let private mainAsync argv = async {
     writeNewLine "Running " ConsoleColor.Green
     write (ifDebug "Debug" "Release") ConsoleColor.DarkGreen
@@ -34,15 +38,15 @@ let private mainAsync argv = async {
 
     let mutable retval = 0
 
-    try (* TEMP-NMB...
-        do! GamePlayer.computerVsComputer GamePlayer.intermediate GamePlayer.basic 1 *)
+    try (* TEMP-NMB... *)
+        do! GamePlayer.computerVsComputer GamePlayer.intermediate GamePlayer.basic 1
         (* TEMP-NMB...
         do! GamePlayer.humanVsComputer GamePlayer.neph GamePlayer.random 1 *)
-        (* TEMP-NMB... *)
-        do! GamePlayer.humanVsHuman GamePlayer.neph GamePlayer.jack 1
+        (* TEMP-NMB...
+        do! GamePlayer.humanVsHuman GamePlayer.neph GamePlayer.jack 1 *)
 
         (* TEMP-NMB...
-        Heuristics.workInProgress () *)
+        Heuristics.run (findSrcDir (DirectoryInfo Environment.CurrentDirectory)) "intermediate" forCribIntermediate 500 *)
 
         ()
     with | exn ->

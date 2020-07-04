@@ -120,7 +120,7 @@ type private PeggingState = {
                 Player2Knocked = isKnock
                 Player2Score = newScore this.Player2Score score
                 CurrentPegging = currentPegging }
-    member this.PegState(player, cutCard, selfCrib) =
+    member this.PegState(player, cutCard, selfCrib, isDealer) =
         let mapForSelf (pegging:(Card * Player) list) : Pegged = pegging |> List.map (fun (card, player') -> card, player' = player)
         let previouslyPegged = this.PreviousPegging |> List.map mapForSelf
         let pegged = mapForSelf this.CurrentPegging
@@ -134,6 +134,7 @@ type private PeggingState = {
             NotPeggable = notPeggable
             CutCard = cutCard
             SelfCrib = selfCrib
+            IsDealer = isDealer
         }
     member this.Completed = this.Player1Hand.Count = 0 && this.Player2Hand.Count = 0 && this.Player1Knocked && this.Player2Knocked
 
@@ -558,7 +559,7 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
                                     let hand = if player = Player1 then peggingState.Player1Hand else peggingState.Player2Hand
                                     if hand.Count = 0 then sourcedLogger.Debug("...{player} has no more cards to peg", (toPlayerDetails player).Name)
                                     let cutCard, selfCrib = currentDeal.ForPegState(player)
-                                    let pegState = peggingState.PegState(player, cutCard, selfCrib)
+                                    let pegState = peggingState.PegState(player, cutCard, selfCrib, currentDeal.IsDealer(player))
                                     let peggable = pegState.Peggable
                                     let canPeg, isInteractive = peggable.Count > 0 || canClaimGo, if player = Player1 then player1IsInteractive else player2IsInteractive
                                     match isInteractive, canPeg with
