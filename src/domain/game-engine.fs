@@ -120,10 +120,21 @@ type private PeggingState = {
                 Player2Knocked = isKnock
                 Player2Score = newScore this.Player2Score score
                 CurrentPegging = currentPegging }
-    member this.Pegged(player) : (Card * IsSelf) list = this.CurrentPegging |> List.map (fun (card, player') -> card, player' = player)
-    member this.Peggable(player) : CardS =
-        (if player = Player1 then this.Player1Hand else this.Player2Hand)
-        |> Set.filter (fun (rank, _) -> pips (this.CurrentPegging |> List.map fst) + rank.PipValue <= MAX_PEGGING)
+    member this.PegState(player, cutCard, selfCrib) =
+        let mapForSelf (pegging:(Card * Player) list) : Pegged = pegging |> List.map (fun (card, player') -> card, player' = player)
+        let previouslyPegged = this.PreviousPegging |> List.map mapForSelf
+        let pegged = mapForSelf this.CurrentPegging
+        let hand = if player = Player1 then this.Player1Hand else this.Player2Hand
+        let currentPips = pips (this.CurrentPegging |> List.map fst)
+        let peggable, notPeggable = hand |> Set.partition (fun (rank, _) -> currentPips + rank.PipValue <= MAX_PEGGING)
+        {
+            PreviouslyPegged = previouslyPegged
+            Pegged = pegged
+            Peggable = peggable
+            NotPeggable = notPeggable
+            CutCard = cutCard
+            SelfCrib = selfCrib
+        }
     member this.Completed = this.Player1Hand.Count = 0 && this.Player2Hand.Count = 0 && this.Player1Knocked && this.Player2Knocked
 
 type private CurrentDeal = {
@@ -131,7 +142,8 @@ type private CurrentDeal = {
     Deck : Deck
     DealerHand : Hand
     NonDealerHand : Hand
-    Crib : Crib
+    DealerForCrib : CardS
+    NonDealerForCrib : CardS
     CutCard : Card option
     NibsScore : int<point> option
     PeggingState : PeggingState option
@@ -141,7 +153,8 @@ type private CurrentDeal = {
     with
     member this.IsDealer(player) : IsDealer = this.Dealer = player
     member this.Hand(player) = if this.IsDealer(player) then this.DealerHand else this.NonDealerHand
-    member this.UpdateHand(player, hand, crib) = if this.IsDealer(player) then { this with DealerHand = hand ; Crib = crib } else { this with NonDealerHand = hand; Crib = crib }
+    member this.UpdateHand(player, hand, forCrib) =
+        if this.IsDealer(player) then { this with DealerHand = hand ; DealerForCrib = forCrib } else { this with NonDealerHand = hand; NonDealerForCrib = forCrib }
     member this.Score(player) =
         let defaultValue score = score |> Option.defaultValue 0<point>
         let peggingScore =
@@ -150,6 +163,10 @@ type private CurrentDeal = {
             | None -> None
         if this.IsDealer(player) then defaultValue this.NibsScore + defaultValue peggingScore + defaultValue this.DealerHandScore + defaultValue this.CribScore
         else defaultValue peggingScore + defaultValue this.NonDealerHandScore
+    member this.ForPegState(player) =
+        match this.CutCard with
+        | Some cutCard -> cutCard, (if this.IsDealer(player) then this.DealerForCrib else this.NonDealerForCrib)
+        | None -> raise NotCutException
 
 type Completed = bool
 
@@ -258,7 +275,8 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
             Deck = deck
             DealerHand = dealerHand
             NonDealerHand = nonDealerHand
-            Crib = Set.empty
+            DealerForCrib = Set.empty
+            NonDealerForCrib = Set.empty
             CutCard = None
             NibsScore = None
             PeggingState = None
@@ -276,8 +294,8 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
     let gameState = cval (newGame (if normalizedRandom () < 0.5 then Player1 else Player2))
     let awaitingForCribPlayer1 : cval<(IsDealer * Hand) option> = cval None
     let awaitingForCribPlayer2 : cval<(IsDealer * Hand) option> = cval None
-    let awaitingPegPlayer1 : cval<(Pegged * Peggable) option> = cval None
-    let awaitingPegPlayer2 : cval<(Pegged * Peggable) option> = cval None
+    let awaitingPegPlayer1 : cval<PegState option> = cval None
+    let awaitingPegPlayer2 : cval<PegState option> = cval None
     let awaitingCannotPegPlayer1 = cval false
     let awaitingCannotPegPlayer2 = cval false
     let awaitingNewDealPlayer1 = cval false
@@ -315,9 +333,9 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
     let handToCrib (currentDeal:CurrentDeal) player forCrib =
         let hand = currentDeal.Hand(player)
         failIfNotDealtHand hand
-        let hand, crib = removeFromHand (hand, forCrib), addToCrib (currentDeal.Crib, forCrib)
+        let hand = removeFromHand (hand, forCrib)
         sourcedLogger.Debug("...{player} adds {forCrib} to crib -> hand is {hand}", (toPlayerDetails player).Name, cardsText forCrib, cardsText hand)
-        hand, crib
+        hand
     let handleForCribNonInteractive player =
         match toPlayerDetails player with
         | Human _ -> raise (UnexpectedForCribNonInteractiveException player)
@@ -326,8 +344,9 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
             let hand = currentDeal.Hand(player)
             failIfNotDealtHand hand
             sourcedLogger.Debug("Choosing cards for crib from {player}...", name)
-            let hand, crib = handToCrib currentDeal player (forCribStrategy (currentDeal.IsDealer(player), hand))
-            transact (fun _ -> gameState.Value <- { gameState.Value with CurrentDeal = currentDeal.UpdateHand(player, hand, crib) })
+            let forCrib = forCribStrategy (currentDeal.IsDealer(player), hand)
+            let hand = handToCrib currentDeal player forCrib
+            transact (fun _ -> gameState.Value <- { gameState.Value with CurrentDeal = currentDeal.UpdateHand(player, hand, forCrib) })
             match forCribNonInteractive () with
             | Some input -> Some input
             | None -> if gameState.Value.ReadyForCut then Some Cut else None
@@ -401,10 +420,10 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
                 | Some _ -> sourcedLogger.Debug("Awaiting cards for crib from {player}...", player2.Name)
                 | None -> awaitingForCribInteractive Player2
                 match awaitingPegPlayer1.Value with
-                | Some (_, peggable) -> sourcedLogger.Debug("Awaiting {cardOrGo} from {player}...", (if peggable.Count > 0 then "pegging card" else "go"), player1.Name)
+                | Some pegState -> sourcedLogger.Debug("Awaiting {cardOrGo} from {player}...", (if pegState.Peggable.Count > 0 then "pegging card" else "go"), player1.Name)
                 | None -> ()
                 match awaitingPegPlayer2.Value with
-                | Some (_, peggable) -> sourcedLogger.Debug("Awaiting {cardOrGo} from {player}...", (if peggable.Count > 0 then "pegging card" else "go"), player2.Name)
+                | Some pegState -> sourcedLogger.Debug("Awaiting {cardOrGo} from {player}...", (if pegState.Peggable.Count > 0 then "pegging card" else "go"), player2.Name)
                 | None -> ()
                 if awaitingCannotPegPlayer1.Value then sourcedLogger.Debug("Awaiting cannot peg from {player}...", player1.Name)
                 if awaitingCannotPegPlayer2.Value then sourcedLogger.Debug("Awaiting cannot peg from {player}...", player2.Name)
@@ -416,9 +435,9 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
                 | Interactive (ForCrib (player, forCrib)) ->
                     if (if player = Player1 then awaitingForCribPlayer1 else awaitingForCribPlayer2).Value |> Option.isNone then raise (UnexpectedForCribInteractiveException player)
                     let currentDeal = gameState.Value.CurrentDeal
-                    let hand, crib = handToCrib currentDeal player forCrib
+                    let hand = handToCrib currentDeal player forCrib
                     transact (fun _ ->
-                        gameState.Value <- { gameState.Value with CurrentDeal = currentDeal.UpdateHand(player, hand, crib) }
+                        gameState.Value <- { gameState.Value with CurrentDeal = currentDeal.UpdateHand(player, hand, forCrib) }
                         (if player = Player1 then awaitingForCribPlayer1 else awaitingForCribPlayer2).Value <- None)
                     if gameState.Value.ReadyForCut then inbox.Post Cut
                     return! loop None
@@ -538,18 +557,20 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
                                 | player ->
                                     let hand = if player = Player1 then peggingState.Player1Hand else peggingState.Player2Hand
                                     if hand.Count = 0 then sourcedLogger.Debug("...{player} has no more cards to peg", (toPlayerDetails player).Name)
-                                    let peggable = peggingState.Peggable(player)
+                                    let cutCard, selfCrib = currentDeal.ForPegState(player)
+                                    let pegState = peggingState.PegState(player, cutCard, selfCrib)
+                                    let peggable = pegState.Peggable
                                     let canPeg, isInteractive = peggable.Count > 0 || canClaimGo, if player = Player1 then player1IsInteractive else player2IsInteractive
                                     match isInteractive, canPeg with
                                     | true, true ->
-                                        peggingState, Some (fun () -> (if player = Player1 then awaitingPegPlayer1 else awaitingPegPlayer2).Value <- Some (peggingState.Pegged(player), peggable))
+                                        peggingState, Some (fun () -> (if player = Player1 then awaitingPegPlayer1 else awaitingPegPlayer2).Value <- Some pegState)
                                     | true, false -> peggingState, Some (fun () -> (if player = Player1 then awaitingCannotPegPlayer1 else awaitingCannotPegPlayer2).Value <- true)
                                     | false, true ->
                                         match toPlayerDetails player with
                                         | Human _ -> raise (UnexpectedPeggingForHumanPlayerException player)
                                         | Computer (name, _, pegStrategy) ->
                                             sourcedLogger.Debug("Choosing {cardOrGo} from {player}...", (if peggable.Count > 0 then "pegging card" else "go"), name)
-                                            let card = pegStrategy (peggingState.Pegged(player), peggable)
+                                            let card = pegStrategy pegState
                                             peg (Some peggingState) player card, None
                                     | false, false ->
                                         match toPlayerDetails player with
@@ -605,7 +626,9 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
                         | None, _ -> raise NotCutException
                         | Some _, Some _ -> raise AlreadyScoredException
                         | Some cutCard, None ->
-                            let dealer, crib = currentDeal.Dealer, currentDeal.Crib
+                            let crib = addToCrib (Set.empty, currentDeal.DealerForCrib)
+                            let crib = addToCrib (crib, currentDeal.NonDealerForCrib)
+                            let dealer = currentDeal.Dealer
                             let events = CribScoreEvent.Process(crib, cutCard)
                             let score = events |> List.sumBy (fun event -> event.Score)
                             sourcedLogger.Debug("Crib: {crib} | {cutCard} -> {dealer} scores {score}", cardsText crib, cardText cutCard, (toPlayerDetails dealer).Name, score)
@@ -647,6 +670,15 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
     member _.Players = player1, player2
     member _.Scores = gameState |> AVal.map (fun gameState -> gameState.Scores)
     member _.Dealer = gameState |> AVal.map (fun gameState -> gameState.CurrentDeal.Dealer)
+    member _.Crib = gameState |> AVal.map (fun gameState ->
+        let dealerForCrib, nonDealerForCrib = gameState.CurrentDeal.DealerForCrib, gameState.CurrentDeal.NonDealerForCrib
+        match dealerForCrib.Count, nonDealerForCrib.Count with
+        | 0, 0 -> None
+        | 0, _ -> Some nonDealerForCrib
+        | _, 0 -> Some dealerForCrib
+        | _ ->
+            let crib = addToCrib (Set.empty, dealerForCrib)
+            Some (addToCrib (crib, nonDealerForCrib)))
     member _.CutCard = gameState |> AVal.map (fun gameState -> gameState.CurrentDeal.CutCard)
     member _.AwaitingForCrib(player) =
         (if player = Player1 then awaitingForCribPlayer1 else awaitingForCribPlayer2)
@@ -658,7 +690,7 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
         (if player = Player1 then awaitingPegPlayer1 else awaitingPegPlayer2)
         |> AVal.map (fun awaiting ->
             match awaiting with
-            | Some (pegged, peggable) -> Some (pegged, peggable, fun card -> agent.Post(Interactive (Peg (player, card))))
+            | Some pegState -> Some (pegState, fun card -> agent.Post(Interactive (Peg (player, card))))
             | None -> None)
     member _.AwaitingCannotPeg(player) =
         (if player = Player1 then awaitingCannotPegPlayer1 else awaitingCannotPegPlayer2)

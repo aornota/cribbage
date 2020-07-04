@@ -39,7 +39,7 @@ let private mainAsync argv = async {
         (* TEMP-NMB...
         do! GamePlayer.humanVsComputer GamePlayer.neph GamePlayer.random 1 *)
         (* TEMP-NMB... *)
-        do! GamePlayer.humanVsHuman GamePlayer.neph GamePlayer.jack 11
+        do! GamePlayer.humanVsHuman GamePlayer.neph GamePlayer.jack 1
 
         (* TEMP-NMB...
         Heuristics.workInProgress () *)

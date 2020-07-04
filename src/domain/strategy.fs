@@ -8,13 +8,21 @@ exception PartialCribDoesNotContain2CardsException of string
 exception PartialCribMustNotContainCutCardException of string
 
 type IsDealer = bool
+
+type ForCribStrategy = IsDealer * Hand -> CardS
+
 type IsSelf = bool
 type Pegged = (Card * IsSelf) list
-type Peggable = CardS
 
-// TODO-NMB: For advanced strategies, augment with subset of "game state" (e.g. scores)?...
-type ForCribStrategy = IsDealer * Hand -> CardS
-type PegStrategy = Pegged * Peggable -> Card option // TODO-NMB: Augment with "previously pegged"?...
+type PegState = {
+    PreviouslyPegged : Pegged list
+    Pegged : Pegged
+    Peggable : CardS
+    NotPeggable : CardS
+    CutCard : Card
+    SelfCrib : CardS }
+
+type PegStrategy = PegState -> Card option
 
 let private partialCribScore (isDealer:IsDealer) (partialCrib:CardL) (cutCard:Card) =
     if partialCrib.Length <> 2 then raise (PartialCribDoesNotContain2CardsException (sprintf "Partial Crib (%s) does not contain 2 Cards" (cardsText (partialCrib |> Set.ofList))))
@@ -47,15 +55,16 @@ let forCribIntermediate (isDealer:IsDealer, dealt:Hand) : CardS = forCrib true (
 
 // TODO-NMB: forCribAdvanced, i.e. similar to forCribIntermediate - but using opponent-crib-rank-frequency heuristics and "full crib" scoring (but non-exhaustive sampling)?...
 
-let private pegNoneOnlyOrRandom (peggable:Peggable) = if peggable.Count = 0 then None else Some (randomSingle peggable)
+let private pegNoneOnlyOrRandom (peggable:CardS) = if peggable.Count = 0 then None else Some (randomSingle peggable)
 
-let pegRandom (_:Pegged, peggable:Peggable) = pegNoneOnlyOrRandom peggable
+let pegRandom (pegState:PegState) = pegNoneOnlyOrRandom pegState.Peggable
 
-let pegBasic (pegged:Pegged, peggable:Peggable) = // chooses highest-scoring card, else "safest", else random
+let pegBasic (pegState:PegState) = // chooses highest-scoring card, else random "safe zone", else random "not danger zone", else random
+    let pegged = pegState.Pegged |> List.map fst
+    let peggable = pegState.Peggable
     match peggable.Count with
     | 0 | 1 -> pegNoneOnlyOrRandom peggable
     | _ ->
-        let pegged = pegged |> List.map fst
         let highestScoring =
             let scoring =
                 peggable

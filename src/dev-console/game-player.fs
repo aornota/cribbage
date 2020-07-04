@@ -98,9 +98,9 @@ let private handleGameOverEvent (engine:GameEngine) games (name1:string) (name2:
 
 let private scoresCallback (name1:string) (name2:string) (score1, score2) = if score1 + score2 > 0<point> then sourcedLogger.Debug("...{name1} {score1} - {score2} {name2}", name1, score1, score2, name2)
 
-let private awaitingForCribCallback strategy = function | Some (isDealer, hand, forCrib) -> forCrib (strategy (isDealer, hand)) | None -> ()
+let private awaitingForCribCallback (strategy:ForCribStrategy) = function | Some (isDealer, hand, forCrib) -> forCrib (strategy (isDealer, hand)) | None -> ()
 
-let private awaitingPegCallback strategy = function | Some (pegged, peggable, peg) -> peg (strategy (pegged, peggable)) | None -> ()
+let private awaitingPegCallback (strategy:PegStrategy) = function | Some (pegState, peg) -> peg (strategy pegState) | None -> ()
 let private awaitingCannotPegCallback = function | Some cannotPeg -> cannotPeg () | None -> ()
 
 let private awaitingNewDealCallback = function | Some newDeal -> newDeal () | None -> ()
@@ -110,7 +110,7 @@ let private intermediateStrategy : ForCribStrategy * PegStrategy = forCribInterm
 let private basicStrategy : ForCribStrategy * PegStrategy = forCribBasic, pegBasic
 let private randomStrategy : ForCribStrategy * PegStrategy = forCribRandom, pegRandom
 
-let intermediate, basic, random = ("Better", intermediateStrategy), ("Basic", basicStrategy), ("Random", randomStrategy)
+let intermediate, basic, random = ("Intermediate", intermediateStrategy), ("Basic", basicStrategy), ("Random", randomStrategy)
 let neph, jack = ("Neph", intermediateStrategy), ("Jack", intermediateStrategy)
 
 let computerVsComputer (computer1, strategy1) (computer2, strategy2) games = async {
