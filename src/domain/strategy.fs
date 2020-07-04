@@ -43,33 +43,41 @@ let forCribRandom (_:IsDealer, dealt:Hand) = randomChoice 2 dealt
 
 let forCribBasic (isDealer:IsDealer, dealt:Hand) : CardS = forCrib false (isDealer, dealt)
 
-let forCribBetter (isDealer:IsDealer, dealt:Hand) : CardS = forCrib true (isDealer, dealt)
+let forCribIntermediate (isDealer:IsDealer, dealt:Hand) : CardS = forCrib true (isDealer, dealt)
 
-let private pegNoneOrRandom (peggable:Peggable) = if peggable.Count = 0 then None else Some (randomSingle peggable)
+// TODO-NMB: forCribAdvanced, i.e. similar to forCribIntermediate - but using opponent-crib-rank-frequency heuristics and "full crib" scoring (but non-exhaustive sampling)?...
 
-let pegRandom (_:Pegged, peggable:Peggable) = pegNoneOrRandom peggable
+let private pegNoneOnlyOrRandom (peggable:Peggable) = if peggable.Count = 0 then None else Some (randomSingle peggable)
+
+let pegRandom (_:Pegged, peggable:Peggable) = pegNoneOnlyOrRandom peggable
 
 let pegBasic (pegged:Pegged, peggable:Peggable) = // chooses highest-scoring card, else "safest", else random
-    let pegged = pegged |> List.map fst
-    let highestScoring =
-        let scoring =
-            peggable
-            |> List.ofSeq
-            |> List.choose (fun card -> match PeggingScoreEvent.Play(pegged, Some card) with | h :: t -> Some(card, h :: t |> List.sumBy (fun event -> event.Score)) | [] -> None)
-        match scoring with
-        | h :: t ->
-            let max = h :: t |> List.map snd |> List.max
-            h :: t |> List.choose (fun (card, score) -> if score = max then Some card else None)
-        | [] -> []
-    match highestScoring with
-    | h :: t -> Some (randomSingle (h :: t |> Set.ofList))
-    | [] ->
-        let isSafeZone pips = pips < 5<pip> || (pips > 15<pip> && pips < 21<pip>)
-        match peggable |> List.ofSeq |> List.choose (fun card -> if isSafeZone (pips (card :: pegged)) then Some card else None) with
+    match peggable.Count with
+    | 0 | 1 -> pegNoneOnlyOrRandom peggable
+    | _ ->
+        let pegged = pegged |> List.map fst
+        let highestScoring =
+            let scoring =
+                peggable
+                |> List.ofSeq
+                |> List.choose (fun card -> match PeggingScoreEvent.Play(pegged, Some card) with | h :: t -> Some(card, h :: t |> List.sumBy (fun event -> event.Score)) | [] -> None)
+            match scoring with
+            | h :: t ->
+                let max = h :: t |> List.map snd |> List.max
+                h :: t |> List.choose (fun (card, score) -> if score = max then Some card else None)
+            | [] -> []
+        match highestScoring with
         | h :: t -> Some (randomSingle (h :: t |> Set.ofList))
         | [] ->
-            // TODO-NMB: Discourage making the score 10? But not as strongly as discouraging making the score 5?...
-            let isDangerZone pips = pips = 5<pip> || pips = 21<pip>
-            match peggable |> List.ofSeq |> List.choose (fun card -> if isDangerZone (pips (card :: pegged)) then None else Some card) with
+            let isSafeZone pips = pips < 5<pip> || (pips > 15<pip> && pips < 21<pip>)
+            match peggable |> List.ofSeq |> List.choose (fun card -> if isSafeZone (pips (card :: pegged)) then Some card else None) with
             | h :: t -> Some (randomSingle (h :: t |> Set.ofList))
-            | [] -> pegNoneOrRandom peggable
+            | [] ->
+                let isDangerZone pips = pips = 5<pip> || pips = 21<pip>
+                match peggable |> List.ofSeq |> List.choose (fun card -> if isDangerZone (pips (card :: pegged)) then None else Some card) with
+                | h :: t -> Some (randomSingle (h :: t |> Set.ofList))
+                | [] -> pegNoneOnlyOrRandom peggable
+
+// TODO-NMB: pegIntermediate, i.e. similar to pegBasic - but adjusted for oppenent-next-peg score?...
+
+// TODO-NMB: pegAdvanced, i.e. similar to pegIntermediate - but using opponent-hand-rank-frequency heuristics?...

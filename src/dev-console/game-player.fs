@@ -32,6 +32,7 @@ let private statistics player =
         let winPercentage = (float (playerGameSummaries |> List.filter (fun (_, won) -> won) |> List.length) / float games) * 100.0
         let playerGameSummaries = playerGameSummaries |> List.map fst
         let zero = { Total = 0<point> ; Count = 0 }
+        let gameMean = Mean<_>.FromList(playerGameSummaries |> List.map (fun summary -> summary.Score))
         let peggingMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingMean)) zero
         let peggingDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingDealerMean)) zero
         let peggingNotDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.PeggingNotDealerMean)) zero
@@ -39,14 +40,15 @@ let private statistics player =
         let handDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandDealerMean)) zero
         let handNotDealerMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.HandNotDealerMean)) zero
         let cribMean = playerGameSummaries |> List.fold (fun acc summary -> Mean<_>.Combine(acc, summary.CribMean)) zero
-        Some (games, winPercentage, peggingMean, peggingDealerMean, peggingNotDealerMean, handMean, handDealerMean, handNotDealerMean, cribMean)
+        Some (games, winPercentage, gameMean, peggingMean, peggingDealerMean, peggingNotDealerMean, handMean, handDealerMean, handNotDealerMean, cribMean)
     | [] -> None
 
-let private logStatistics (name:string) (statistics:(int<game> * float * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point>) option) =
+let private logStatistics (name:string) (statistics:(int<game> * float * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point> * Mean<point>) option) =
     match statistics with
-    | Some (games, winPercentage, peggingMean, peggingDealerMean, peggingNotDealerMean, handMean, handDealerMean, handNotDealerMean, cribMean) ->
+    | Some (games, winPercentage, gameMean, peggingMean, peggingDealerMean, peggingNotDealerMean, handMean, handDealerMean, handNotDealerMean, cribMean) ->
         sourcedLogger.Information("Statistics for {name} ({games} game/s):", name, games)
         sourcedLogger.Information("\tWin percentage -> {percentage}%", Math.Round(winPercentage, 2))
+        sourcedLogger.Information("\tMean game score -> {mean}", Math.Round(float gameMean.Mean, 2))
         sourcedLogger.Information("\tMean pegging score -> {mean}", Math.Round(float peggingMean.Mean, 2))
         sourcedLogger.Information("\t\twhen dealer -> {mean}", Math.Round(float peggingDealerMean.Mean, 2))
         sourcedLogger.Information("\t\twhen not dealer -> {mean}", Math.Round(float peggingNotDealerMean.Mean, 2))
@@ -104,12 +106,12 @@ let private awaitingCannotPegCallback = function | Some cannotPeg -> cannotPeg (
 let private awaitingNewDealCallback = function | Some newDeal -> newDeal () | None -> ()
 let private awaitingNewGameCallback = function | Some newGame -> (if not hasQuit then newGame () else ()) | None -> ()
 
-let private betterStrategy : ForCribStrategy * PegStrategy = forCribBetter, pegBasic
+let private intermediateStrategy : ForCribStrategy * PegStrategy = forCribIntermediate, pegBasic
 let private basicStrategy : ForCribStrategy * PegStrategy = forCribBasic, pegBasic
 let private randomStrategy : ForCribStrategy * PegStrategy = forCribRandom, pegRandom
 
-let better, basic, random = ("Better", betterStrategy), ("Basic", basicStrategy), ("Random", randomStrategy)
-let neph, jack = ("Neph", betterStrategy), ("Jack", betterStrategy)
+let intermediate, basic, random = ("Better", intermediateStrategy), ("Basic", basicStrategy), ("Random", randomStrategy)
+let neph, jack = ("Neph", intermediateStrategy), ("Jack", intermediateStrategy)
 
 let computerVsComputer (computer1, strategy1) (computer2, strategy2) games = async {
     let games = validateGames games

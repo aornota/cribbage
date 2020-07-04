@@ -14,24 +14,24 @@ open Serilog
 
 type Player = | Player1 | Player2
 
-exception PlayersHaveSameNameException
-exception HandDoesNotContain6CardsException
+exception AlreadyCutException
+exception AlreadyScoredException
 exception GameNotFinishedException
-exception UnexpectedInitialInputException
-exception UnexpectedForCribInteractiveException of Player
-exception NoScoreForGoException
-exception UnexpectedPegException of Player
-exception UnexpectedPegInteractiveException of Player
-exception UnexpectedCannotPegInteractiveException of Player
-exception UnexpectedPeggingException
+exception HandDoesNotContain6CardsException
 exception InvalidCurrentPeggingException
+exception NoScoreForGoException
+exception NotCutException
+exception PlayersHaveSameNameException
+exception UnexpectedCannotPegInteractiveException of Player
+exception UnexpectedForCribInteractiveException of Player
+exception UnexpectedForCribNonInteractiveException of Player
+exception UnexpectedInitialInputException
 exception UnexpectedNewDealRequestException of Player
 exception UnexpectedNewGameRequestException of Player
-exception UnexpectedForCribForHumanPlayerException of Player
+exception UnexpectedPegException of Player
+exception UnexpectedPeggingException
 exception UnexpectedPeggingForHumanPlayerException of Player
-exception AlreadyCutException
-exception NotCutException
-exception AlreadyScoredException
+exception UnexpectedPegInteractiveException of Player
 
 let [<Literal>] private SOURCE = "Domain.GameEngine"
 
@@ -318,6 +318,19 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
         let hand, crib = removeFromHand (hand, forCrib), addToCrib (currentDeal.Crib, forCrib)
         sourcedLogger.Debug("...{player} adds {forCrib} to crib -> hand is {hand}", (toPlayerDetails player).Name, cardsText forCrib, cardsText hand)
         hand, crib
+    let handleForCribNonInteractive player =
+        match toPlayerDetails player with
+        | Human _ -> raise (UnexpectedForCribNonInteractiveException player)
+        | Computer (name, forCribStrategy, _) ->
+            let currentDeal = gameState.Value.CurrentDeal
+            let hand = currentDeal.Hand(player)
+            failIfNotDealtHand hand
+            sourcedLogger.Debug("Choosing cards for crib from {player}...", name)
+            let hand, crib = handToCrib currentDeal player (forCribStrategy (currentDeal.IsDealer(player), hand))
+            transact (fun _ -> gameState.Value <- { gameState.Value with CurrentDeal = currentDeal.UpdateHand(player, hand, crib) })
+            match forCribNonInteractive () with
+            | Some input -> Some input
+            | None -> if gameState.Value.ReadyForCut then Some Cut else None
     let peg (peggingState:PeggingState option) player card =
         match peggingState with
         | Some peggingState ->
@@ -375,19 +388,10 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
         let rec loop (initialInput:Input option) = async {
             match initialInput with
             | Some (ForCribNonInteractive player) ->
-                match toPlayerDetails player with
-                | Human _ -> raise (UnexpectedForCribForHumanPlayerException player)
-                | Computer (name, forCribStrategy, _) ->
-                    let currentDeal = gameState.Value.CurrentDeal
-                    let hand = currentDeal.Hand(player)
-                    failIfNotDealtHand hand
-                    sourcedLogger.Debug("Choosing cards for crib from {player}...", name)
-                    let hand, crib = handToCrib currentDeal player (forCribStrategy (currentDeal.IsDealer(player), hand))
-                    transact (fun _ -> gameState.Value <- { gameState.Value with CurrentDeal = currentDeal.UpdateHand(player, hand, crib) })
-                    match forCribNonInteractive () with
-                    | Some input -> inbox.Post input
-                    | None -> if gameState.Value.ReadyForCut then inbox.Post Cut
-                    return! loop None
+                match handleForCribNonInteractive player with
+                | Some input -> inbox.Post input
+                | None -> ()
+                return! loop None
             | Some _ -> raise UnexpectedInitialInputException
             | None ->
                 match awaitingForCribPlayer1.Value with
@@ -456,19 +460,10 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
                     sourcedLogger.Debug("...{name} has quit", (toPlayerDetails player).Name)
                     return ()
                 | ForCribNonInteractive player ->
-                    match toPlayerDetails player with
-                    | Human _ -> raise (UnexpectedForCribForHumanPlayerException player)
-                    | Computer (name, forCribStrategy, _) ->
-                        let currentDeal = gameState.Value.CurrentDeal
-                        let hand = currentDeal.Hand(player)
-                        failIfNotDealtHand hand
-                        sourcedLogger.Debug("Choosing cards for crib from {player}...", name)
-                        let hand, crib = handToCrib currentDeal player (forCribStrategy (currentDeal.IsDealer(player), hand))
-                        transact (fun _ -> gameState.Value <- { gameState.Value with CurrentDeal = currentDeal.UpdateHand(player, hand, crib) })
-                        match forCribNonInteractive () with
-                        | Some input -> inbox.Post input
-                        | None -> if gameState.Value.ReadyForCut then inbox.Post Cut
-                        return! loop None
+                    match handleForCribNonInteractive player with
+                    | Some input -> inbox.Post input
+                    | None -> ()
+                    return! loop None
                 | Cut ->
                     let currentDeal = gameState.Value.CurrentDeal
                     if currentDeal.CutCard |> Option.isSome then raise AlreadyCutException

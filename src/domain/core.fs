@@ -33,12 +33,12 @@ type CardL = Card list // use list when ordering matters
 type Deck = CardL
 type Pegging = CardL
 
-exception InsufficientCardsException of string
-exception CardsAlreadyInHandException of string
-exception CardsNotInHandException of string
 exception CannotAddToCribException of string
 exception CanOnlyAdd2CardsToCribException of string
 exception CardsAlreadyInCribException of string
+exception CardsAlreadyInHandException of string
+exception CardsNotInHandException of string
+exception InsufficientCardsException of string
 
 let private unshuffledDeck : CardS =
     [ Spade ; Heart ; Diamond ; Club ]

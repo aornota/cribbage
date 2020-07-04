@@ -35,14 +35,14 @@ let private mainAsync argv = async {
     let mutable retval = 0
 
     try (* TEMP-NMB...
-        do! GamePlayer.computerVsComputer GamePlayer.better GamePlayer.basic 1 *)
+        do! GamePlayer.computerVsComputer GamePlayer.intermediate GamePlayer.basic 1 *)
         (* TEMP-NMB...
         do! GamePlayer.humanVsComputer GamePlayer.neph GamePlayer.random 1 *)
         (* TEMP-NMB... *)
-        do! GamePlayer.humanVsHuman GamePlayer.neph GamePlayer.jack 1
+        do! GamePlayer.humanVsHuman GamePlayer.neph GamePlayer.jack 11
 
         (* TEMP-NMB...
-        Scratchpad.workInProgress () *)
+        Heuristics.workInProgress () *)
 
         ()
     with | exn ->
