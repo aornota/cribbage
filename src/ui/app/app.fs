@@ -88,5 +88,7 @@ let private render (state:State) dispatch = render' {| state = state ; dispatch 
 
 Program.mkProgram init transition render
 |> Program.withReactSynchronous "app" // needs to match id of div in index.html
+#if DEBUG
 |> Program.withConsoleTrace
+#endif
 |> Program.run
