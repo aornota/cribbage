@@ -1,0 +1,10 @@
+group ui
+
+    FSharp.Data.Adaptive
+    Fable.Core
+	Fable.Elmish.React
+	Fable.MaterialUI.Icons
+	Fable.MaterialUI.MaterialDesignIcons
+    Feliz
+	Feliz.ElmishComponents
+    Feliz.MaterialUI

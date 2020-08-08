@@ -1,17 +1,24 @@
 {
     "editor.fontSize": 12
     , "files.exclude": {
-		".fake/": true
+		".fable/": true
+		, ".fake/": true
 		, ".ionide/": true
         , ".paket/": true
+		, "node_modules/": true
 		, "paket-files/": true
 		, "src/**/bin/": true
         , "src/**/logs/": true
         , "src/**/obj/": true
+		, "src/ui/publish/": true
+		, "temp-gh-pages/": true
         , ".editorconfig": true
         , "LICENSE": true
 		, "paket.lock": true
+		, "yarn-error.log": true
+		, "yarn.lock": true
     }
 	, "FSharp.fsacRuntime": "netcore"
+	, "FSharp.suggestGitignore": false
 	, "FSharp.suggestSdkScripts": false
 }

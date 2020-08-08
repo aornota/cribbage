@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>netcoreapp3.1</TargetFramework>
+        <TreatWarningsAsErrors>false</TreatWarningsAsErrors> <!-- TEMP-NMB: Until warnings no longer occur (e.g. in FSharp.Data.Adaptive / &c.)... -->
+    </PropertyGroup>
+    <ItemGroup>
+        <Compile Include="..\..\paket-files\ui\krauthaufen\Fable.Elmish.Adaptive\src\Fable.React.Adaptive\JsHelpers.fs" />
+        <Compile Include="..\..\paket-files\ui\krauthaufen\Fable.Elmish.Adaptive\src\Fable.React.Adaptive\Hooks.fs" />
+        <Compile Include="app.fs" />
+    </ItemGroup>
+    <Import Project="..\..\.paket\Paket.Restore.targets" />
+</Project>

@@ -1,0 +1,40 @@
+{
+    "name": "cribbage",
+    "version": "α",
+    "description": "Work-in-progress towards a cribbage game",
+    "repository": "git@github.com:aornota/cribbage.git",
+    "author": "dj narration",
+    "license": "Unlicense",
+    "dependencies": {
+        "@material-ui/core": "^4.11.0",
+        "@material-ui/icons": "^4",
+        "@material-ui/lab": "^4.0.0-alpha.56",
+		"material-design-icons": "^3",
+		"mdi-material-ui": "^6.17.0",
+        "react": "^16.13.1",
+        "react-dom": "^16.13.1",
+		"source-map-support": "^0",
+		"typeface-roboto": "^0"
+    },
+    "devDependencies": {
+        "@babel/core": "^7.11.1",
+        "@babel/preset-env": "^7.11.0",
+        "babel-loader": "^8.1.0",
+        "copy-webpack-plugin": "^6.0.3",
+        "core-js": "3.6.5",
+		"css-loader": "^4.2.1",
+        "fable-compiler": "^2.10.2",
+        "fable-loader": "^2.1.9",
+        "file-loader": "^6.0.0",
+        "html-webpack-plugin": "^4.3.0",
+		"mini-css-extract-plugin": "^0.9.0",
+        "remotedev": "^0.2.9",
+        "resolve-url-loader": "^3",
+        "sass": "^1.26.10",
+        "sass-loader": "^9.0.2",
+        "style-loader": "^1.2.1",
+        "webpack": "^4.44.1",
+        "webpack-cli": "^3.3.12",
+        "webpack-dev-server": "^3.11.0"
+    }
+}

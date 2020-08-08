@@ -1,8 +1,13 @@
+.fable/
 .fake/
 .ionide/
+node_modules/
 paket-files/
+publish/
 src/heuristics/
 bin/
 logs/
 obj/
+temp-gh-pages/
 appsettings.development*.json
+yarn-error.log

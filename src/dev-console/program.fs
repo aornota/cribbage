@@ -38,15 +38,15 @@ let private mainAsync argv = async {
 
     let mutable retval = 0
 
-    try (* TEMP-NMB... *)
-        do! GamePlayer.computerVsComputer GamePlayer.intermediate GamePlayer.basic 1
+    try (* TEMP-NMB...
+        do! GamePlayer.computerVsComputer GamePlayer.intermediate GamePlayer.basic 1 *)
         (* TEMP-NMB...
         do! GamePlayer.humanVsComputer GamePlayer.neph GamePlayer.random 1 *)
-        (* TEMP-NMB...
-        do! GamePlayer.humanVsHuman GamePlayer.neph GamePlayer.jack 1 *)
+        (* TEMP-NMB... *)
+        do! GamePlayer.humanVsHuman GamePlayer.neph GamePlayer.jack 1
 
         (* TEMP-NMB...
-        Heuristics.run (findSrcDir (DirectoryInfo Environment.CurrentDirectory)) "intermediate" forCribIntermediate 500 *)
+        Heuristics.run (findSrcDir (DirectoryInfo(Environment.CurrentDirectory))) "intermediate" forCribIntermediate 50000 *)
 
         ()
     with | exn ->
