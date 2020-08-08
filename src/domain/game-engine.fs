@@ -7,7 +7,7 @@ open Aornota.Cribbage.Domain.Scoring
 open Aornota.Cribbage.Domain.Strategy
 
 open FSharp.Data.Adaptive
-#if FABLE
+#if FABLE_COMPILER
 #else
 open Serilog
 #endif
@@ -39,30 +39,30 @@ let [<Literal>] private GAME_TARGET = 121<point>
 let [<Literal>] private DEALT_HAND_COUNT = 6
 
 type private SourcedLogger () =
-#if FABLE
+#if FABLE_COMPILER
 #else
     let sourcedLogger = sourcedLogger SOURCE Log.Logger
 #endif
     member _.Debug(messageTemplate: string, [<System.ParamArray>] propertyValues: obj []) =
-#if FABLE
+#if FABLE_COMPILER
         ()
 #else
         sourcedLogger.Debug(messageTemplate, propertyValues)
 #endif
     member _.Information(messageTemplate: string, [<System.ParamArray>] propertyValues: obj []) =
-#if FABLE
+#if FABLE_COMPILER
         ()
 #else
         sourcedLogger.Information(messageTemplate, propertyValues)
 #endif
     member _.Warning(messageTemplate: string, [<System.ParamArray>] propertyValues: obj []) =
-#if FABLE
+#if FABLE_COMPILER
         ()
 #else
         sourcedLogger.Warning(messageTemplate, propertyValues)
 #endif
     member _.Error(messageTemplate: string, [<System.ParamArray>] propertyValues: obj []) =
-#if FABLE
+#if FABLE_COMPILER
         ()
 #else
         sourcedLogger.Error(messageTemplate, propertyValues)
@@ -667,7 +667,10 @@ type GameEngine(player1:PlayerDetails, player2:PlayerDetails) =
                     match forCribNonInteractive () with | Some input -> inbox.Post input | None -> ()
                     return! loop None }
         loop (forCribNonInteractive ()))
+#if FABLE_COMPILER
+#else
     do agent.Error.Add (fun exn -> sourcedLogger.Error("Unexpected error -> {message}", exn.Message))
+#endif
     member _.Players = player1, player2
     member _.Scores = gameState |> AVal.map (fun gameState -> gameState.Scores)
     member _.Dealer = gameState |> AVal.map (fun gameState -> gameState.CurrentDeal.Dealer)

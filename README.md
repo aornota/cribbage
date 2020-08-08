@@ -4,7 +4,7 @@ _Work-in-progress towards a cribbage game..._
 
 #### Development prerequisites
 
-- [Microsoft .NET Core 3.1 SDK](https://dotnet.microsoft.com/download/dotnet-core/3.1/): I'm currently using 3.2.302
+- [Microsoft .NET Core 3.1 SDK](https://dotnet.microsoft.com/download/dotnet-core/3.1/): I'm currently using 3.1.302
 - [FAKE 5](https://fake.build/): _dotnet tool install fake-cli --global_; I'm currently using 5.20.2
 - [Paket](https://fsprojects.github.io/Paket/): _dotnet tool install paket --global_; I'm currently using 5.249.0
 - [Yarn](https://yarnpkg.com/lang/en/docs/install/): I'm currently using 1.22.4

@@ -1,7 +1,7 @@
 module Aornota.Cribbage.Common.Mathy
 
 open System
-#if FABLE
+#if FABLE_COMPILER
 #else
 open System.Security.Cryptography
 #endif
@@ -21,7 +21,7 @@ type Mean<[<Measure>] 'u> = {
     member this.Mean : float<'u> = LanguagePrimitives.FloatWithMeasure (float this.Total / float this.Count)
 
 let randoms count =
-#if FABLE
+#if FABLE_COMPILER
     let rnd = Random()
     [ for _ in 1..count do yield rnd.Next() ]
 #else
