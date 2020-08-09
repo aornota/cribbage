@@ -6,7 +6,7 @@ module Aornota.Cribbage.Ui.Theme
 open Feliz
 open Feliz.MaterialUI
 
-type AppTheme = {
+type private AppTheme = {
     PaletteType : PaletteType
     Primary : string
     Secondary : string
@@ -55,17 +55,16 @@ let private buildTheme (appTheme:AppTheme) = Styles.createMuiTheme ([
         if isDarkTheme then style.backgroundColor "#303030 !important"
         else style.backgroundColor (defaultTheme.palette.background.``default`` + "!important") ] ])
 
-let getTheme isDark = (if isDark then AppTheme.Dark else AppTheme.Light) |> buildTheme
+let getTheme isDark = buildTheme (if isDark then AppTheme.Dark else AppTheme.Light)
 
 let useStyles : unit -> _ = Styles.makeStyles (fun styles (theme:Theme) ->
-    let drawerWidth = 200
+    (* let drawerWidth = 200 *)
     {|
         appBar = styles.create [
             style.zIndex (theme.zIndex.drawer + 1)
             style.cursor "default"
-            style.userSelect.none
             style.display.grid ]
-        containerCard = styles.create [ style.padding (length.em 1) ]
+        (* containerCard = styles.create [ style.padding (length.em 1) ]
         contentCard = styles.create [ style.height (length.percent 100) ]
         content = styles.create [
             style.flexGrow 1
@@ -84,28 +83,16 @@ let useStyles : unit -> _ = Styles.makeStyles (fun styles (theme:Theme) ->
             style.paddingBottom (length.em 1)
             style.paddingLeft (length.em 5)
             style.paddingRight (length.em 5)
-            style.flexGrow 1 ]
-        githubButton = styles.create [
-            style.custom ("color", "inherit")
-            style.custom ("backgroundColor", "inherit") ]
-        githubText = styles.create [
-            style.textTransform.none
-            style.margin 0 ]
+            style.flexGrow 1 ] *)
         root = styles.create [
             style.display.flex
             style.height.inheritFromParent
             style.userSelect.none ]
-        sampleApp = styles.create [
+        (* sampleApp = styles.create [
             style.paddingTop (length.em 2)
             style.paddingBottom (length.em 2) ]
-        mtBackground = styles.create [ style.backgroundColor theme.palette.background.``default`` ]
+        mtBackground = styles.create [ style.backgroundColor theme.palette.background.``default`` ] *)
         title = styles.create [ style.width (length.percent 100) ]
-        titleButton = styles.create [
-            style.padding 5
-            style.paddingRight 10
-            style.paddingLeft 10
-            style.color.white
-            style.borderRadius (length.percent 20) ]
         toolbar = styles.create [ yield! theme.mixins.toolbar ]
-        unselectable = styles.create [ style.userSelect.none ]
+        (* unselectable = styles.create [ style.userSelect.none ] *)
     |})

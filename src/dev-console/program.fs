@@ -3,7 +3,6 @@ module Aornota.Cribbage.DevConsole.Program
 open Aornota.Cribbage.Common.Console
 open Aornota.Cribbage.Common.IfDebug
 open Aornota.Cribbage.Common.SourcedLogger
-open Aornota.Cribbage.Domain.Strategy
 
 open Giraffe.SerilogExtensions
 open Microsoft.Extensions.Configuration
@@ -38,15 +37,11 @@ let private mainAsync argv = async {
 
     let mutable retval = 0
 
-    try (* TEMP-NMB...
-        do! GamePlayer.computerVsComputer GamePlayer.intermediate GamePlayer.basic 1 *)
-        (* TEMP-NMB...
-        do! GamePlayer.humanVsComputer GamePlayer.neph GamePlayer.random 1 *)
-        (* TEMP-NMB... *)
-        do! GamePlayer.humanVsHuman GamePlayer.neph GamePlayer.jack 1
+    try (* TEMP-NMB... *)
+        do! GamePlayer.play GamePlayer.neph GamePlayer.jack 1
 
         (* TEMP-NMB...
-        Heuristics.run (findSrcDir (DirectoryInfo(Environment.CurrentDirectory))) "intermediate" forCribIntermediate 50000 *)
+        Heuristics.run (findSrcDir (DirectoryInfo(Environment.CurrentDirectory))) "intermediate" Aornota.Cribbage.Domain.Strategy.forCribIntermediate 50000 *)
 
         ()
     with | exn ->

@@ -114,42 +114,15 @@ let private randomStrategy : ForCribStrategy * PegStrategy = forCribRandom, pegR
 let intermediate, basic, random = ("Intermediate", intermediateStrategy), ("Basic", basicStrategy), ("Random", randomStrategy)
 let neph, jack = ("Neph", intermediateStrategy), ("Jack", intermediateStrategy)
 
-let computerVsComputer (computer1, strategy1) (computer2, strategy2) games = async {
+let play (name1, strategy1:ForCribStrategy * PegStrategy) (name2, strategy2:ForCribStrategy * PegStrategy) games = async {
     let games = validateGames games
-    let computer1, computer2 = if computer1 = computer2 then sprintf "%s %i" computer1 1, sprintf "%s %i" computer2 2 else computer1, computer2
-    log computer1 computer2 games
-    let engine = GameEngine(Computer (computer1, fst strategy1, snd strategy1), Computer (computer2, fst strategy2, snd strategy2))
+    let name1, human2 = if name1 = name2 then sprintf "%s %i" name1 1, sprintf "%s %i" name2 2 else name1, name2
+    log name1 name2 games
+    let engine = GameEngine(name1, name2)
     (* TEMP-NMB...
-    handleScoreEvents engine computer1 computer2 *)
-    handleGameOverEvent engine games computer1 computer2
-    use scoresCallback = engine.Scores.AddCallback(scoresCallback computer1 computer2)
-    while not hasQuit do do! Async.Sleep 250 }
-
-let humanVsComputer (human, strategy1:ForCribStrategy * PegStrategy) (computer, strategy2) games = async {
-    let games = validateGames games
-    let human, computer = if human = computer then sprintf "%s %i" human 1, sprintf "%s %i" computer 2 else human, computer
-    log human computer games
-    let engine = GameEngine(Human human, Computer (computer, fst strategy2, snd strategy2))
-    (* TEMP-NMB...
-    handleScoreEvents engine human computer *)
-    handleGameOverEvent engine games human computer
-    use scoresCallback = engine.Scores.AddCallback(scoresCallback human computer)
-    use awaitingForCrib1Callback = engine.AwaitingForCrib(Player1).AddCallback(awaitingForCribCallback (fst strategy1))
-    use awaitingPeg1Callback = engine.AwaitingPeg(Player1).AddCallback(awaitingPegCallback (snd strategy1))
-    use awaitingCannotPeg1Callback = engine.AwaitingCannotPeg(Player1).AddCallback(awaitingCannotPegCallback)
-    use awaitingNewDeal1Callback = engine.AwaitingNewDeal(Player1).AddCallback(awaitingNewDealCallback)
-    use awaitingNewGame1Callback = engine.AwaitingNewGame(Player1).AddCallback(awaitingNewGameCallback)
-    while not hasQuit do do! Async.Sleep 250 }
-
-let humanVsHuman (human1, strategy1:ForCribStrategy * PegStrategy) (human2, strategy2:ForCribStrategy * PegStrategy) games = async {
-    let games = validateGames games
-    let human1, human2 = if human1 = human2 then sprintf "%s %i" human1 1, sprintf "%s %i" human2 2 else human1, human2
-    log human1 human2 games
-    let engine = GameEngine(Human human1, Human human2)
-    (* TEMP-NMB...
-    handleScoreEvents engine human1 human2 *)
-    handleGameOverEvent engine games human1 human2
-    use scoresCallback = engine.Scores.AddCallback(scoresCallback human1 human2)
+    handleScoreEvents engine name1 name2 *)
+    handleGameOverEvent engine games name1 name2
+    use scoresCallback = engine.Scores.AddCallback(scoresCallback name1 name2)
     use awaitingForCrib1Callback = engine.AwaitingForCrib(Player1).AddCallback(awaitingForCribCallback (fst strategy1))
     use awaitingPeg1Callback = engine.AwaitingPeg(Player1).AddCallback(awaitingPegCallback (snd strategy1))
     use awaitingCannotPeg1Callback = engine.AwaitingCannotPeg(Player1).AddCallback(awaitingCannotPegCallback)

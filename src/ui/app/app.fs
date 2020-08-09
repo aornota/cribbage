@@ -1,7 +1,7 @@
 module Aornota.Cribbage.Ui.App
 
 open Aornota.Cribbage.Domain.GameEngine
-open Aornota.Cribbage.Domain.Strategy
+//open Aornota.Cribbage.Domain.Strategy
 
 open Elmish
 open Elmish.React
@@ -23,6 +23,8 @@ let [<Literal>] private CRIBBAGE_VERSION = "α" // note: keep synchronized with 
 
 let [<Literal>] private CRIBBAGE_LOGO = "tpoc-32x32.png"
 
+let [<Literal>] private CRIBBAGE_REPO = "https://github.com/aornota/cribbage"
+
 type Msg = | SettingsMsg of Settings.Msg
 
 type State = { Settings : Settings.State }
@@ -36,24 +38,27 @@ let private transition msg state =
         { state with Settings = newSettings }, cmd |> Cmd.map SettingsMsg
 
 let private render' = React.functionComponent (fun (input: {| state : State ; dispatch : Msg -> unit |}) ->
-    let theme, styles = Theme.getTheme input.state.Settings.UseDarkTheme, Theme.useStyles ()
+    let prefersDarkTheme = Hooks.useMediaQuery "@media (prefers-color-scheme: dark)"
+    let useDarkTheme = input.state.Settings.UseDarkTheme |> Option.defaultValue prefersDarkTheme
+    let theme, c = Theme.getTheme useDarkTheme, Theme.useStyles ()
     Mui.themeProvider [
         themeProvider.theme theme
         themeProvider.children [
             Html.div [
-                prop.className styles.root
+                prop.className c.root
                 prop.children [
                     Mui.cssBaseline []
                     Mui.appBar [
-                        prop.className styles.appBar
+                        appBar.classes.root c.appBar
                         appBar.color.secondary
                         appBar.position.fixed'
                         appBar.children [
                             Mui.toolbar [
+                                toolbar.classes.root c.toolbar
                                 toolbar.children [
                                     Mui.typography [
-                                        prop.className styles.title
-                                        typography.align.left
+                                        typography.classes.root c.title
+                                        typography.variant.h6
                                         typography.children [
                                             Html.img [
                                                 prop.style [ style.verticalAlign.middle ]
@@ -61,18 +66,33 @@ let private render' = React.functionComponent (fun (input: {| state : State ; di
                                                 prop.alt CRIBBAGE ]
                                             Html.text " | "
                                             Html.strong CRIBBAGE
-                                            Html.text (sprintf " (%s)" CRIBBAGE_VERSION) ] ]
-                                    Mui.iconButton [
-                                        prop.className styles.titleButton
-                                        iconButton.disableRipple true
-                                        prop.onClick <| fun _ -> Settings.ToggleUseDarkTheme |> SettingsMsg |> input.dispatch
-                                        prop.children [ themeLightDarkIcon [] ] ]
-                                    Mui.iconButton [
-                                        prop.className styles.titleButton
-                                        prop.href "https://github.com/aornota/cribbage"
-                                        prop.custom ("target", "_blank")
-                                        iconButton.disableRipple true
-                                        prop.children [ githubCircleIcon [] ] ] ] ] ] ]
+                                            Html.text " ("
+                                            Html.em CRIBBAGE_VERSION
+                                            Html.text ")"  ] ]
+                                    Mui.tooltip [
+                                        tooltip.title (
+                                            match input.state.Settings.UseDarkTheme with
+                                            | Some true -> "Using dark theme"
+                                            | Some false -> "Using light theme"
+                                            | None -> "Using system light/dark theme")
+                                        tooltip.children (
+                                            Mui.iconButton [
+                                                prop.onClick (fun _ -> Settings.ToggleUseDarkTheme |> SettingsMsg |> input.dispatch)
+                                                iconButton.color.inherit'
+                                                iconButton.children [
+                                                    match input.state.Settings.UseDarkTheme with
+                                                    | Some true -> brightness4Icon []
+                                                    | Some false -> brightness7Icon  []
+                                                    | None -> brightnessAutoIcon [] ] ] ) ]
+                                    Mui.tooltip [
+                                        tooltip.title "aornota/cribbage on GitHub"
+                                        tooltip.children (
+                                            Mui.iconButton [
+                                                prop.href CRIBBAGE_REPO
+                                                prop.custom ("target", "_blank")
+                                                //iconButton.component' "a"
+                                                iconButton.color.inherit'
+                                                iconButton.children [ githubCircleIcon [] ] ]) ] ] ] ] ]
                     (* Html.main [
                         prop.className c.content
                         prop.children [
@@ -84,7 +104,8 @@ let private render' = React.functionComponent (fun (input: {| state : State ; di
 
 let private render (state:State) dispatch = render' {| state = state ; dispatch = dispatch |}
 
-// TODO-NMB: Figure out why this is problematic...GameEngine(Computer ("Basic 1", forCribBasic, pegBasic), Computer ("Basic 2", forCribBasic, pegBasic)) |> ignore
+// TODO-NMB: Use "web worker"/s [see https://shmew.github.io/Feliz.UseWorker/] to run forCrib | peg strategies (since forCrib can take a couple of seconds, during which the UI is unresponsive)...
+GameEngine("Basic", "Neph") |> ignore
 
 Program.mkProgram init transition render
 |> Program.withReactSynchronous "app" // needs to match id of div in index.html
