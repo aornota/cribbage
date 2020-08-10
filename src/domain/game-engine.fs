@@ -42,8 +42,8 @@ type private SourcedLogger () =
 #endif
     member _.Debug(messageTemplate: string, [<System.ParamArray>] propertyValues: obj []) =
 #if FABLE_COMPILER
-        (* TEMP-NMB... *)
-        Browser.Dom.console.log(messageTemplate, propertyValues)
+        (* TEMP-NMB...
+        Browser.Dom.console.log(messageTemplate, propertyValues) *)
         ()
 #else
         sourcedLogger.Debug(messageTemplate, propertyValues)
@@ -473,6 +473,7 @@ type GameEngine(player1Name:string, player2Name:string) =
                 return! loop ()
             | Pegging ->
                 let currentDeal = gameState.Value.CurrentDeal
+                //sourcedLogger.Debug("Pegging:PeggingState -> ", currentDeal.PeggingState) // TEMP-NMB...
                 match currentDeal.PeggingState with
                 | Some peggingState ->
                     if peggingState.Completed then

@@ -15,16 +15,16 @@ type private AppTheme = {
     with
     static member Dark = {
         PaletteType = PaletteType.Dark
-        Primary = "#105010"
+        Primary = "#504030"
         PrimaryContrastText = "#fff"
-        Secondary = "#101050"
-        Error = "#501010" }
+        Secondary = "#304050"
+        Error = "#f00" }
     static member Light = {
         PaletteType = PaletteType.Light
-        Primary = "#afefef"
+        Primary = "#cfdfef"
         PrimaryContrastText = "#000"
-        Secondary = "#efefaf"
-        Error = "#efafef" }
+        Secondary = "#efdfcf"
+        Error = "#f00" }
 
 let private defaultTheme = Styles.createMuiTheme ()
 
@@ -64,7 +64,7 @@ let useStyles : unit -> _ = Styles.makeStyles (fun styles (theme:Theme) ->
             style.zIndex (theme.zIndex.drawer + 1)
             style.cursor "default"
             style.display.grid ]
-        (* containerCard = styles.create [ style.padding (length.em 1) ]
+        (* containerCard = styles.create [ style.padding (length.em 1) ] *)
         contentCard = styles.create [ style.height (length.percent 100) ]
         content = styles.create [
             style.flexGrow 1
@@ -73,7 +73,7 @@ let useStyles : unit -> _ = Styles.makeStyles (fun styles (theme:Theme) ->
             style.paddingLeft (length.em 2)
             style.paddingRight (length.em 2)
             style.paddingBottom (length.em 1) ]
-        drawer = styles.create [
+        (* drawer = styles.create [
             style.zIndex theme.zIndex.drawer
             style.width drawerWidth
             style.flexShrink 0 ]
