@@ -406,7 +406,9 @@ type GameEngine(player1Name:string, player2Name:string) =
                 if gameState.Value.ReadyForCut then inbox.Post Cut
                 return! loop ()
             | Interactive (Peg (player, card)) ->
-                if (if player = Player1 then awaitingPegPlayer1 else awaitingPegPlayer2).Value |> Option.isNone then raise (UnexpectedPegInteractiveException player)
+                if (if player = Player1 then awaitingPegPlayer1 else awaitingPegPlayer2).Value |> Option.isNone then
+                    sourcedLogger.Debug "Fucknuts!" // TENP-NMB...
+                    raise (UnexpectedPegInteractiveException player)
                 let currentDeal = gameState.Value.CurrentDeal
                 transact (fun _ ->
                     gameState.Value <- { gameState.Value with CurrentDeal = { currentDeal with PeggingState = Some (peg currentDeal.PeggingState player card) } }

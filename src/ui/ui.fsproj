@@ -11,10 +11,9 @@
         <Compile Include="..\domain\scoring.fs" />
         <Compile Include="..\domain\strategy.fs" />
         <Compile Include="..\domain\game-engine.fs" />
-        <Compile Include="workers\forCribWorkers.fs" />
-        <Compile Include="workers\Sort.fs" /> <!-- TEMP-NMB: For investigating web worker behaviour... -->
         <Compile Include="Fable.React.Adaptive\JsHelpers.fs" />
         <Compile Include="Fable.React.Adaptive\Hooks.fs" />
+        <Compile Include="workers\strategies.fs" />
         <Compile Include="app\theme.fs" />
         <Compile Include="app\settings.fs" />
         <Compile Include="app\game.fs" />

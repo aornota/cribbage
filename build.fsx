@@ -110,6 +110,7 @@ Target.create "help" (fun _ ->
     printfn "\n\thelp -> shows this list of build targets\n")
 
 "clean-ui" ==> "restore-ui" ==> "build-workers"
+
 "build-workers" ==> "run"
 "build-workers" ==> "build" ==> "publish-gh-pages"
 

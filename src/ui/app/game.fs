@@ -18,17 +18,25 @@ open FSharp.Data.Adaptive
 
 type private PlayerDetails = { // TODO-NMB: Distinguish between non-interactive (with forCrib | peg strategies) and interactive?...
     Name : string
-    ForCribStrategy : ForCribStrategy
-    PegStrategy : PegStrategy }
+    ForCribStrategyWorker : WorkerFunc<IsDealer * CardL, CardL>
+    PegStrategyWorker :
+        WorkerFunc<{| previouslyPegged : Pegged list ; pegged : Pegged ; peggable : Card list ; notPeggable : Card list ; cutCard : Card ; selfCrib : Card list ; isDealer : IsDealer |}, bool * Card>}
 
 type private GameDetails = { // TODO-NMB: More (cf. dev-console\game-player.fs)?...
     Player1Details : PlayerDetails
     Player2Details : PlayerDetails
     GameEngine : GameEngine }
 
-let [<Literal>] private SLEEP = 1
+let [<Literal>] private SLEEP = 100
 
-// TODO-NMB: Use "web worker"/s [see https://shmew.github.io/Feliz.UseWorker/] to run forCrib | peg strategies (since forCrib can take a couple of seconds, during which the UI is unresponsive)...
+let private toAnon (pegState:PegState) = {|
+    previouslyPegged = pegState.PreviouslyPegged
+    pegged = pegState.Pegged
+    peggable = pegState.Peggable |> List.ofSeq
+    notPeggable = pegState.NotPeggable |> List.ofSeq
+    cutCard = pegState.CutCard
+    selfCrib = pegState.SelfCrib |> List.ofSeq
+    isDealer = pegState.IsDealer |}
 
 // TODO-NMB: Should scores | awaitingForCrib | &c. be React.memo?...
 
@@ -48,8 +56,7 @@ let private crib' = React.functionComponent ("Crib", fun (props:{| crib : aval<C
     | Some cards ->
         Mui.typography [
             typography.children [
-                Html.strong "Crib"
-                Html.text (sprintf " -> %A" (cardsText cards)) ] ]
+                Html.text (sprintf "Crib -> %A" (cardsText cards)) ] ]
     | None -> Html.none)
 let private crib crib = crib' {| crib = crib |}
 
@@ -59,62 +66,47 @@ let private cutCard' = React.functionComponent ("CutCard", fun (props:{| cutCard
     | Some card ->
         Mui.typography [
             typography.children [
-                Html.strong "Cut card"
-                Html.text (sprintf " -> %A" (cardText card)) ] ]
+                Html.text (sprintf "Cut card -> %A" (cardText card)) ] ]
     | None -> Html.none)
 let private cutCard cutCard = cutCard' {| cutCard = cutCard |}
 
 let private awaitingForCrib' = React.functionComponent ("AwaitingForCrib", fun (props:{| fForCrib : aval<(IsDealer * Hand * (CardS -> unit)) option> ; player : PlayerDetails |}) ->
     let fForCrib = ReactHB.Hooks.useAdaptive props.fForCrib
-
-    (* TEMP-NMB: This freezes the UI for a couple of seconds (or less with random strategy)... *)
-    let forCrib () = async {
-        do! Async.Sleep SLEEP
-        match fForCrib with | Some (isDealer, hand, forCrib) -> forCrib (props.player.ForCribStrategy (isDealer, hand)) | None -> () }
-        //match fForCrib with | Some (isDealer, hand, forCrib) -> forCrib (ForCribWorkers.forCribRandomWorker.InvokeSync(isDealer, hand)) | None -> () }
-    React.useEffect (forCrib >> Async.StartImmediate, [| box fForCrib |])
-
-    (* TEMP-NMB: Experimenting with web worker...
-    let worker, workerStatus = React.useWorker ForCribWorkers.forCribRandomWorker // TODO-NMB: Specify worker/s in PlayerDetails...
+    let worker, workerStatus = React.useWorker props.player.ForCribStrategyWorker
     let runWorker () =
-        match fForCrib, workerStatus with
-        | Some (isDealer, hand, forCrib), WorkerStatus.Pending ->
-            let withResult cards =
-                Browser.Dom.console.log (sprintf "%s forCrib -> %s" props.player.Name (cardsText cards))
-                forCrib cards
-            worker.exec ((isDealer, hand), withResult)
-        | _ -> ()
-    React.useEffect (runWorker, [| box fForCrib |]) *)
-
-    (* TEMP-NMB: Testing simple web worker...
-    let worker, workerStatus = React.useWorker TestWorkers.Sort.sortNumbers
-    let runWorker () = worker.exec ((), fun i -> Browser.Dom.console.log (sprintf "%s sortNumbers -> %i" props.player.Name i))
-    React.useEffect runWorker *)
-
+        match fForCrib with
+        | Some (isDealer, hand, forCrib) when workerStatus <> WorkerStatus.Running && workerStatus <> WorkerStatus.Killed -> worker.exec ((isDealer, hand |> List.ofSeq), Set.ofList >> forCrib)
+        | Some _ -> Browser.Dom.console.log "Should never happen: awaitingPForCrib' runWoeker when Some fForCrib but worker neither Running nor Killed"
+        | None -> ()
+    React.useEffect (runWorker, [| box fForCrib |])
     match fForCrib with
     | Some (isDealer, hand, _) ->
         Mui.typography [
             typography.children [
                 Html.em (sprintf "awaitingForCrib (%s)" props.player.Name)
                 Html.text (sprintf " -> %b | %A..." isDealer hand)
-                (* TEMP-NMB...
-                Html.text (sprintf "%A" workerStatus) *)
-            ] ]
+                Html.strong (sprintf "%A" workerStatus) ] ]
     | None -> Html.none)
 let private awaitingForCrib (fForCrib, player) = awaitingForCrib' {| fForCrib = fForCrib ; player = player |}
 
 let private awaitingPeg' = React.memo ("AwaitingPeg", fun (props:{| fPeg : aval<(PegState * (Card option -> unit)) option> ; player : PlayerDetails |}) ->
     let fPeg = ReactHB.Hooks.useAdaptive props.fPeg
-    let peg () = async {
-        do! Async.Sleep SLEEP
-        match fPeg with | Some (pegState, peg) -> peg (props.player.PegStrategy pegState) | None -> () }
-    React.useEffect (peg >> Async.StartImmediate, [| box fPeg |])
+    let worker, workerStatus = React.useWorker props.player.PegStrategyWorker
+    let runWorker () =
+        match fPeg with
+        | Some (pegState, peg) when workerStatus <> WorkerStatus.Running && workerStatus <> WorkerStatus.Killed ->
+            // Note: option<Card> also problematic - so hack around this.
+            worker.exec (toAnon pegState, (fun (isSome, card) -> peg (if isSome then Some card else None)))
+        | Some _ -> Browser.Dom.console.log "Should never happen: awaitingPeg' runWoeker when Some fpeg but worker neither Running nor Killed"
+        | None -> ()
+    React.useEffect (runWorker, [| box fPeg |])
     match fPeg with
     | Some (pegState, _) ->
         Mui.typography [
             typography.children [
                 Html.em (sprintf "awaitingPeg (%s)" props.player.Name)
-                Html.text (sprintf " -> %A..." pegState) ] ]
+                Html.text (sprintf " -> %A..." pegState)
+                Html.strong (sprintf "%A" workerStatus) ] ]
     | None -> Html.none)
 let private awaitingPeg (fPeg, player) = awaitingPeg' {| fPeg = fPeg ; player = player |}
 
@@ -167,8 +159,9 @@ let game = React.memo ("Game", fun () ->
             card.raised true
             prop.children [
                 scores (gameDetails.GameEngine.Scores, gameDetails.Player1Details, gameDetails.Player2Details)
-                //crib gameDetails.GameEngine.Crib
-                //cutCard gameDetails.GameEngine.CutCard
+                crib gameDetails.GameEngine.Crib
+                cutCard gameDetails.GameEngine.CutCard
+                Mui.divider []
                 awaitingForCrib (gameDetails.GameEngine.AwaitingForCrib(Player1), gameDetails.Player1Details)
                 awaitingForCrib (gameDetails.GameEngine.AwaitingForCrib(Player2), gameDetails.Player2Details)
                 awaitingPeg (gameDetails.GameEngine.AwaitingPeg(Player1), gameDetails.Player1Details)
@@ -181,8 +174,8 @@ let game = React.memo ("Game", fun () ->
         ] ]
     | None ->
         // TODO-NMB: UI to enter name | select opponent skill level | &c. | ...
-        let player1Details : PlayerDetails = { Name = "Random" ; ForCribStrategy = forCribRandom ; PegStrategy = pegRandom }
-        let player2Details : PlayerDetails = { Name = "Neph" ; ForCribStrategy = forCribIntermediate ; PegStrategy = pegIntermediate }
+        let player1Details : PlayerDetails = { Name = "Basic" ; ForCribStrategyWorker = Strategies.forCribBasicWorker ; PegStrategyWorker = Strategies.pegBasicWorker }
+        let player2Details : PlayerDetails = { Name = "Neph" ; ForCribStrategyWorker = Strategies.forCribIntermediateWorker ; PegStrategyWorker = Strategies.pegIntermediateWorker }
         let gameDetails = {
             Player1Details = player1Details
             Player2Details = player2Details
