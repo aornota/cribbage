@@ -1,17 +1,13 @@
 [<RequireQualifiedAccess>]
 module Aornota.Cribbage.Ui.Settings
 
-// Based on https://github.com/Shmew/Feliz.MaterialUI.MaterialTable/blob/master/docs/App.fs.
+// Adapted from on https://github.com/Shmew/Feliz.MaterialUI.MaterialTable/blob/master/docs/App.fs.
 
 open Browser.WebStorage
 
-open Elmish
+open FSharp.Data.Adaptive
 
 type Setting = | UseDarkTheme
-
-type Msg = | ToggleUseDarkTheme
-
-type State = { UseDarkTheme : bool option }
 
 let private readSetting setting parser =
     localStorage.getItem (string setting)
@@ -22,11 +18,9 @@ let private writeSetting setting value = localStorage.setItem (string setting, v
 
 let private asBool (s:string) = match s.ToLower() with | "true" -> true | _ -> false
 
-let init () = { UseDarkTheme = readSetting UseDarkTheme asBool }
+let useDarkTheme = cval (readSetting UseDarkTheme asBool)
 
-let transition msg state =
-    match msg with
-    | ToggleUseDarkTheme ->
-        let newUseDarkTheme = match state.UseDarkTheme with | None | Some false -> true | Some true -> false
-        writeSetting UseDarkTheme (string newUseDarkTheme)
-        { state with UseDarkTheme = Some newUseDarkTheme }, Cmd.none
+let toggleUseDarkTheme prefersDarkTheme =
+    let newUseDarkTheme = match useDarkTheme.Value with | None -> not prefersDarkTheme | Some false -> true | Some true -> false
+    writeSetting UseDarkTheme (string newUseDarkTheme)
+    transact (fun _ -> useDarkTheme.Value <- Some newUseDarkTheme)

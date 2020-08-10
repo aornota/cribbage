@@ -1,4 +1,4 @@
-# ![cribbage](https://raw.githubusercontent.com/aornota/cribbage/master/src/ui/public/tpoc-32x32.png) | cribbage (_α_)
+# ![cribbage](https://raw.githubusercontent.com/aornota/cribbage/master/src/ui/public/tpoc-32x32.png) | cribbage (_pre-α_)
 
 _Work-in-progress towards a cribbage game..._
 

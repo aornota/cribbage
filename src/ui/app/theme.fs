@@ -1,7 +1,7 @@
 [<RequireQualifiedAccess>]
 module Aornota.Cribbage.Ui.Theme
 
-// Based on https://github.com/Shmew/Feliz.MaterialUI.MaterialTable/blob/master/docs/App.fs.
+// Adapted from https://github.com/Shmew/Feliz.MaterialUI.MaterialTable/blob/master/docs/App.fs.
 
 open Feliz
 open Feliz.MaterialUI

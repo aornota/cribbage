@@ -1,6 +1,6 @@
 {
     "name": "cribbage",
-    "version": "α",
+    "version": "pre-α",
     "description": "Work-in-progress towards a cribbage game",
     "repository": "git@github.com:aornota/cribbage.git",
     "author": "dj narration",
