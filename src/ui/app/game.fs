@@ -27,7 +27,7 @@ type private GameDetails = { // TODO-NMB: More (cf. dev-console\game-player.fs)?
     Player2Details : PlayerDetails
     GameEngine : GameEngine }
 
-let [<Literal>] private SLEEP = 100
+let [<Literal>] private SLEEP = 1
 
 let private toAnon (pegState:PegState) = {|
     previouslyPegged = pegState.PreviouslyPegged
