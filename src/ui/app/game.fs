@@ -27,7 +27,7 @@ type private GameDetails = { // TODO-NMB: More (cf. dev-console\game-player.fs)?
     Player2Details : PlayerDetails
     GameEngine : GameEngine }
 
-let [<Literal>] private SLEEP = 1
+let [<Literal>] private SLEEP = 250
 
 let private toAnon (pegState:PegState) = {|
     previouslyPegged = pegState.PreviouslyPegged
@@ -96,7 +96,7 @@ let private awaitingPeg' = React.memo ("AwaitingPeg", fun (props:{| fPeg : aval<
         match fPeg with
         | Some (pegState, peg) when workerStatus <> WorkerStatus.Running && workerStatus <> WorkerStatus.Killed ->
             // Note: option<Card> also problematic - so hack around this.
-            worker.exec (toAnon pegState, (fun (isSome, card) -> peg (if isSome then Some card else None)))
+            worker.exec (toAnon pegState, (fun (isSome, (rank, suit)) -> peg (if isSome then Some (rank, suit) else None)))
         | Some _ -> Browser.Dom.console.log "Should never happen: awaitingPeg' runWoeker when Some fpeg but worker neither Running nor Killed"
         | None -> ()
     React.useEffect (runWorker, [| box fPeg |])
