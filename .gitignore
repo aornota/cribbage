@@ -5,6 +5,7 @@ node_modules/
 paket-files/
 publish/
 src/heuristics/
+src/ui/public/Workers/
 bin/
 logs/
 obj/

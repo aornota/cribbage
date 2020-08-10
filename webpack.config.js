@@ -1,21 +1,21 @@
-var path = require("path");
-var webpack = require("webpack");
+var path = require('path');
+var webpack = require('webpack');
 var htmlWebpackPlugin = require('html-webpack-plugin');
 var copyWebpackPlugin = require('copy-webpack-plugin');
 var miniCssExtractPlugin = require('mini-css-extract-plugin');
 
 var config = {
-    indexHtmlTemplate: "./src/ui/index.html"
-    , fsharpEntry: "./src/ui/ui.fsproj"
+    indexHtmlTemplate: './src/ui/index.html'
+    , fsharpEntry: './src/ui/ui.fsproj'
     , scssEntry: './src/ui/style/cribbage.scss'
-    , outputDir: "./src/ui/publish"
-    , assetsDir: "./src/ui/public"
+    , outputDir: './src/ui/publish'
+    , assetsDir: './src/ui/public'
     , devServerPort: 8080
     , babel: {
         presets: [
             ["@babel/preset-env", {
-                "modules": false
-                , "useBuiltIns": "usage"
+                modules: false
+                , useBuiltIns: 'usage'
 				, corejs: 3
             }]
         ]
@@ -23,7 +23,7 @@ var config = {
 }
 
 var isProduction = !process.argv.find(v => v.indexOf('webpack-dev-server') !== -1);
-console.log("Bundling for " + (isProduction ? "production" : "development") + "...");
+console.log('Bundling for ' + (isProduction ? 'production' : 'development') + '...');
 
 // HtmlWebpackPlugin automatically injects <script> or <link> tags for generated bundles.
 var commonPlugins = [
@@ -39,15 +39,15 @@ module.exports = {
         path: resolve(config.outputDir)
         , filename: isProduction ? '[name].[hash].js' : '[name].js'
     }
-    , mode: isProduction ? "production" : "development"
-    , devtool: isProduction ? "" : "eval-source-map"
+    , mode: isProduction ? 'production' : 'development'
+    , devtool: isProduction ? '' : 'eval-source-map'
     , optimization: {
         splitChunks: {
             cacheGroups: {
                 commons: {
-                    test: /node_modules/,
-                    name: "vendors",
-                    chunks: "all"
+                    test: /node_modules/
+                    , name: 'vendors'
+                    , chunks: 'all'
                 }
             }
         }
@@ -76,10 +76,10 @@ module.exports = {
             {
                 test: /\.fs(x|proj)?$/
                 , use: {
-                    loader: "fable-loader"
+                    loader: 'fable-loader'
                     , options: {
                         babel: config.babel
-                        , define: isProduction ? [ "ADAPTIVE_NO_TYPE_TESTS" ] : [ "ADAPTIVE_NO_TYPE_TESTS", "DEBUG" ]
+                        , define: isProduction ? [ 'ADAPTIVE_NO_TYPE_TESTS' ] : [ 'ADAPTIVE_NO_TYPE_TESTS', 'DEBUG' ]
                     }
                 }
             }

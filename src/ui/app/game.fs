@@ -5,11 +5,14 @@ open Aornota.Cribbage.Domain.Core
 open Aornota.Cribbage.Domain.GameEngine
 open Aornota.Cribbage.Domain.Strategy
 
+open Aornota.Cribbage.Ui.Workers
+
 open Fable.React.Adaptive
 module ReactHB = Fable.React.HookBindings
 
 open Feliz
 open Feliz.MaterialUI
+open Feliz.UseWorker
 
 open FSharp.Data.Adaptive
 
@@ -30,7 +33,7 @@ let [<Literal>] private SLEEP = 1
 // TODO-NMB: Should scores | awaitingForCrib | &c. be React.memo?...
 
 let private scores' = React.functionComponent ("Scores", fun (props:{| scores : aval<int<point> * int<point>> ; player1 : PlayerDetails ; player2 : PlayerDetails |}) ->
-    let player1Score, player2Score = ReactHB.Hooks.useAdaptive (props.scores)
+    let player1Score, player2Score = ReactHB.Hooks.useAdaptive props.scores
     Mui.typography [
         typography.paragraph true
         typography.children [
@@ -40,7 +43,7 @@ let private scores' = React.functionComponent ("Scores", fun (props:{| scores : 
 let private scores (scores, player1, player2) = scores' {| scores = scores ; player1 = player1 ; player2 = player2 |}
 
 let private crib' = React.functionComponent ("Crib", fun (props:{| crib : aval<CardS option> |}) ->
-    let crib = ReactHB.Hooks.useAdaptive (props.crib)
+    let crib = ReactHB.Hooks.useAdaptive props.crib
     match crib with
     | Some cards ->
         Mui.typography [
@@ -51,7 +54,7 @@ let private crib' = React.functionComponent ("Crib", fun (props:{| crib : aval<C
 let private crib crib = crib' {| crib = crib |}
 
 let private cutCard' = React.functionComponent ("CutCard", fun (props:{| cutCard : aval<Card option> |}) ->
-    let cutCard = ReactHB.Hooks.useAdaptive (props.cutCard)
+    let cutCard = ReactHB.Hooks.useAdaptive props.cutCard
     match cutCard with
     | Some card ->
         Mui.typography [
@@ -62,26 +65,50 @@ let private cutCard' = React.functionComponent ("CutCard", fun (props:{| cutCard
 let private cutCard cutCard = cutCard' {| cutCard = cutCard |}
 
 let private awaitingForCrib' = React.functionComponent ("AwaitingForCrib", fun (props:{| fForCrib : aval<(IsDealer * Hand * (CardS -> unit)) option> ; player : PlayerDetails |}) ->
-    let fForCrib = ReactHB.Hooks.useAdaptive (props.fForCrib)
-    let forCrib opt () = async {
+    let fForCrib = ReactHB.Hooks.useAdaptive props.fForCrib
+
+    (* TEMP-NMB: This freezes the UI for a couple of seconds (or less with random strategy)... *)
+    let forCrib () = async {
         do! Async.Sleep SLEEP
-        match opt with | Some (isDealer, hand, forCrib) -> forCrib (props.player.ForCribStrategy (isDealer, hand)) | None -> () }
-    React.useEffect (forCrib fForCrib >> Async.StartImmediate, [| box fForCrib |])
+        match fForCrib with | Some (isDealer, hand, forCrib) -> forCrib (props.player.ForCribStrategy (isDealer, hand)) | None -> () }
+        //match fForCrib with | Some (isDealer, hand, forCrib) -> forCrib (ForCribWorkers.forCribRandomWorker.InvokeSync(isDealer, hand)) | None -> () }
+    React.useEffect (forCrib >> Async.StartImmediate, [| box fForCrib |])
+
+    (* TEMP-NMB: Experimenting with web worker...
+    let worker, workerStatus = React.useWorker ForCribWorkers.forCribRandomWorker // TODO-NMB: Specify worker/s in PlayerDetails...
+    let runWorker () =
+        match fForCrib, workerStatus with
+        | Some (isDealer, hand, forCrib), WorkerStatus.Pending ->
+            let withResult cards =
+                Browser.Dom.console.log (sprintf "%s forCrib -> %s" props.player.Name (cardsText cards))
+                forCrib cards
+            worker.exec ((isDealer, hand), withResult)
+        | _ -> ()
+    React.useEffect (runWorker, [| box fForCrib |]) *)
+
+    (* TEMP-NMB: Testing simple web worker...
+    let worker, workerStatus = React.useWorker TestWorkers.Sort.sortNumbers
+    let runWorker () = worker.exec ((), fun i -> Browser.Dom.console.log (sprintf "%s sortNumbers -> %i" props.player.Name i))
+    React.useEffect runWorker *)
+
     match fForCrib with
     | Some (isDealer, hand, _) ->
         Mui.typography [
             typography.children [
                 Html.em (sprintf "awaitingForCrib (%s)" props.player.Name)
-                Html.text (sprintf " -> %b | %A..." isDealer hand) ] ]
+                Html.text (sprintf " -> %b | %A..." isDealer hand)
+                (* TEMP-NMB...
+                Html.text (sprintf "%A" workerStatus) *)
+            ] ]
     | None -> Html.none)
 let private awaitingForCrib (fForCrib, player) = awaitingForCrib' {| fForCrib = fForCrib ; player = player |}
 
 let private awaitingPeg' = React.memo ("AwaitingPeg", fun (props:{| fPeg : aval<(PegState * (Card option -> unit)) option> ; player : PlayerDetails |}) ->
-    let fPeg = ReactHB.Hooks.useAdaptive (props.fPeg)
-    let peg opt () = async {
+    let fPeg = ReactHB.Hooks.useAdaptive props.fPeg
+    let peg () = async {
         do! Async.Sleep SLEEP
-        match opt with | Some (pegState, peg) -> peg (props.player.PegStrategy pegState) | None -> () }
-    React.useEffect (peg fPeg >> Async.StartImmediate, [| box fPeg |])
+        match fPeg with | Some (pegState, peg) -> peg (props.player.PegStrategy pegState) | None -> () }
+    React.useEffect (peg >> Async.StartImmediate, [| box fPeg |])
     match fPeg with
     | Some (pegState, _) ->
         Mui.typography [
@@ -92,11 +119,11 @@ let private awaitingPeg' = React.memo ("AwaitingPeg", fun (props:{| fPeg : aval<
 let private awaitingPeg (fPeg, player) = awaitingPeg' {| fPeg = fPeg ; player = player |}
 
 let private awaitingCannotPeg' = React.functionComponent ("AwaitingCannotPeg", fun (props:{| fCannotPeg : aval<(unit -> unit) option> ; player : PlayerDetails |}) ->
-    let fCannotPeg = ReactHB.Hooks.useAdaptive (props.fCannotPeg)
-    let cannotPeg opt () = async {
+    let fCannotPeg = ReactHB.Hooks.useAdaptive props.fCannotPeg
+    let cannotPeg () = async {
         do! Async.Sleep SLEEP
-        match opt with | Some cannotPeg -> cannotPeg () | None -> () }
-    React.useEffect (cannotPeg fCannotPeg >> Async.StartImmediate, [| box fCannotPeg |])
+        match fCannotPeg with | Some cannotPeg -> cannotPeg () | None -> () }
+    React.useEffect (cannotPeg >> Async.StartImmediate, [| box fCannotPeg |])
     match fCannotPeg with
     | Some _ ->
         Mui.typography [
@@ -106,11 +133,11 @@ let private awaitingCannotPeg' = React.functionComponent ("AwaitingCannotPeg", f
 let private awaitingCannotPeg (fCannotPeg, player) = awaitingCannotPeg' {| fCannotPeg = fCannotPeg ; player = player |}
 
 let private awaitingNewDeal' = React.functionComponent ("AwaitingNewDeal", fun (props:{| fNewDeal : aval<(unit -> unit) option> ; player : PlayerDetails |}) ->
-    let fNewDeal = ReactHB.Hooks.useAdaptive (props.fNewDeal)
-    let newDeal opt () = async {
+    let fNewDeal = ReactHB.Hooks.useAdaptive props.fNewDeal
+    let newDeal () = async {
         do! Async.Sleep SLEEP
-        match opt with | Some newDeal -> newDeal () | None -> () }
-    React.useEffect (newDeal fNewDeal >> Async.StartImmediate, [| box fNewDeal |])
+        match fNewDeal with | Some newDeal -> newDeal () | None -> () }
+    React.useEffect (newDeal >> Async.StartImmediate, [| box fNewDeal |])
     match fNewDeal with
     | Some _ ->
         Mui.typography [

@@ -63,6 +63,7 @@ let private createMissingAppSettingsForDevelopment dir =
 Target.create "clean-ui" (fun _ ->
     !! (uiDir </> "bin")
     ++ (uiDir </> "obj")
+    ++ (uiDir </> "public/Workers")
     ++ uiPublishDir
     |> Seq.iter Shell.cleanDir)
 
@@ -71,6 +72,8 @@ Target.create "restore-ui" (fun _ ->
     runTool yarnTool "--version" __SOURCE_DIRECTORY__
     runTool yarnTool "install --frozen-lockfile" __SOURCE_DIRECTORY__
     runDotNet "restore" uiDir)
+
+Target.create "build-workers" (fun _ -> runTool yarnTool "webpack-cli --config src/ui/workers/webpack.config.js" __SOURCE_DIRECTORY__)
 
 Target.create "run" (fun _ ->
     let ui = async { runTool yarnTool "webpack-dev-server" __SOURCE_DIRECTORY__ }
@@ -106,9 +109,9 @@ Target.create "help" (fun _ ->
     printfn "\n\trun-tests -> builds and runs [Release] tests"
     printfn "\n\thelp -> shows this list of build targets\n")
 
-"clean-ui" ==> "restore-ui"
-"restore-ui" ==> "run"
-"restore-ui" ==> "build" ==> "publish-gh-pages"
+"clean-ui" ==> "restore-ui" ==> "build-workers"
+"build-workers" ==> "run"
+"build-workers" ==> "build" ==> "publish-gh-pages"
 
 // TODO-NMB: Reinstate?..."run-tests" ==> "run-dev-console"
 

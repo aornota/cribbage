@@ -5,14 +5,16 @@
         <TreatWarningsAsErrors>false</TreatWarningsAsErrors> <!-- TEMP-NMB: Until warnings no longer occur (e.g. in FSharp.Data.Adaptive / &c.)... -->
     </PropertyGroup>
     <ItemGroup>
-        <Compile Include="..\..\paket-files\ui\krauthaufen\Fable.Elmish.Adaptive\src\Fable.React.Adaptive\JsHelpers.fs" />
-        <Compile Include="..\..\paket-files\ui\krauthaufen\Fable.Elmish.Adaptive\src\Fable.React.Adaptive\Hooks.fs" />
         <Compile Include="..\common\mathy.fs" />
         <Compile Include="..\common\sourced-logger.fs" />
         <Compile Include="..\domain\core.fs" />
         <Compile Include="..\domain\scoring.fs" />
         <Compile Include="..\domain\strategy.fs" />
         <Compile Include="..\domain\game-engine.fs" />
+        <Compile Include="workers\forCribWorkers.fs" />
+        <Compile Include="workers\Sort.fs" /> <!-- TEMP-NMB: For investigating web worker behaviour... -->
+        <Compile Include="Fable.React.Adaptive\JsHelpers.fs" />
+        <Compile Include="Fable.React.Adaptive\Hooks.fs" />
         <Compile Include="app\theme.fs" />
         <Compile Include="app\settings.fs" />
         <Compile Include="app\game.fs" />

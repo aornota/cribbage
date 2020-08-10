@@ -70,7 +70,7 @@ let private appBar (useDarkThemeSetting, prefersDarkTheme) = appBar' {| useDarkT
 
 let private app = React.functionComponent ("App", fun () ->
     let prefersDarkTheme = Hooks.useMediaQuery "@media (prefers-color-scheme: dark)"
-    let useDarkThemeSetting = ReactHB.Hooks.useAdaptive (Settings.useDarkTheme)
+    let useDarkThemeSetting = ReactHB.Hooks.useAdaptive Settings.useDarkTheme
     let useDarkTheme = useDarkThemeSetting |> Option.defaultValue prefersDarkTheme
     let theme = Theme.getTheme useDarkTheme
     let c = Theme.useStyles ()

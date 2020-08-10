@@ -10,6 +10,7 @@
 		, "src/**/bin/": true
         , "src/**/logs/": true
         , "src/**/obj/": true
+        , "src/ui/public/Workers/": true
 		, "src/ui/publish/": true
 		, "temp-gh-pages/": true
         , ".editorconfig": true

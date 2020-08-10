@@ -43,7 +43,7 @@ type private SourcedLogger () =
     member _.Debug(messageTemplate: string, [<System.ParamArray>] propertyValues: obj []) =
 #if FABLE_COMPILER
         (* TEMP-NMB...
-        Browser.Dom.console.log(messageTemplate, propertyValues) *)
+        Browser.Dom.console.log (messageTemplate, propertyValues) *)
         ()
 #else
         sourcedLogger.Debug(messageTemplate, propertyValues)
