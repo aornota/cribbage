@@ -13,7 +13,7 @@ open Feliz.MaterialUI
 let [<Literal>] private CRIBBAGE = "cribbage"
 
 // *pre-α" | α | β | γ | δ | ε | ζ | η | θ | ι | κ | λ | μ | ν | ξ | ο | π | ρ | σ | τ | υ | φ | χ | ψ | ω
-let [<Literal>] private CRIBBAGE_VERSION = "α" // note: keep synchronized with  ./index.html | ../../package.json | ../../README.md
+let [<Literal>] private CRIBBAGE_VERSION = "pre-α" // note: keep synchronized with  ./index.html | ../../package.json | ../../README.md
 
 let [<Literal>] private CRIBBAGE_LOGO = "tpoc-32x32.png"
 
