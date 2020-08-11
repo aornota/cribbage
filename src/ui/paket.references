@@ -6,6 +6,6 @@ group ui
 	Fable.MaterialUI.Icons
 	Fable.MaterialUI.MaterialDesignIcons
     Feliz
-	Feliz.ElmishComponents
     Feliz.MaterialUI
     Feliz.UseWorker
+    Thoth.Elmish.Toast

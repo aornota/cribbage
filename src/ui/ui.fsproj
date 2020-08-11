@@ -15,7 +15,8 @@
         <Compile Include="Fable.React.Adaptive\Hooks.fs" />
         <Compile Include="workers\strategies.fs" />
         <Compile Include="app\theme.fs" />
-        <Compile Include="app\settings.fs" />
+        <Compile Include="app\storage.fs" />
+        <Compile Include="app\toaster.fs" />
         <Compile Include="app\game.fs" />
         <Compile Include="app\app.fs" />
     </ItemGroup>

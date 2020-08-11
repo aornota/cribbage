@@ -3,6 +3,7 @@ module Aornota.Cribbage.Ui.Game
 
 open Aornota.Cribbage.Domain.Core
 open Aornota.Cribbage.Domain.GameEngine
+open Aornota.Cribbage.Domain.Scoring
 open Aornota.Cribbage.Domain.Strategy
 
 open Aornota.Cribbage.Ui.Workers
@@ -22,10 +23,13 @@ type private PlayerDetails = { // TODO-NMB: Distinguish between non-interactive 
     PegStrategyWorker :
         WorkerFunc<{| previouslyPegged : Pegged list ; pegged : Pegged ; peggable : Card list ; notPeggable : Card list ; cutCard : Card ; selfCrib : Card list ; isDealer : IsDealer |}, bool * Card>}
 
-type private GameDetails = { // TODO-NMB: More (cf. dev-console\game-player.fs)?...
+type private GameDetails = { // TODO-NMB: More, e.g. game summaries (cf. game-player.fs)?...
     Player1Details : PlayerDetails
     Player2Details : PlayerDetails
     GameEngine : GameEngine }
+
+let [<Literal>] private FOR_CRIB_WORKER_TIMEOUT = 10000
+let [<Literal>] private PEG_WORKER_TIMEOUT = 5000
 
 let [<Literal>] private SLEEP = 250
 
@@ -70,9 +74,11 @@ let private cutCard' = React.functionComponent ("CutCard", fun (props:{| cutCard
     | None -> Html.none)
 let private cutCard cutCard = cutCard' {| cutCard = cutCard |}
 
+// TODO-NMB: Rethink naming (fForCrib &c.)?...
+
 let private awaitingForCrib' = React.functionComponent ("AwaitingForCrib", fun (props:{| fForCrib : aval<(IsDealer * Hand * (CardS -> unit)) option> ; player : PlayerDetails |}) ->
     let fForCrib = ReactHB.Hooks.useAdaptive props.fForCrib
-    let worker, workerStatus = React.useWorker props.player.ForCribStrategyWorker
+    let worker, workerStatus = React.useWorker (props.player.ForCribStrategyWorker, fun options -> { options with Timeout = Some FOR_CRIB_WORKER_TIMEOUT })
     let runWorker () =
         match fForCrib with
         | Some (isDealer, hand, forCrib) when workerStatus <> WorkerStatus.Running && workerStatus <> WorkerStatus.Killed -> worker.exec ((isDealer, hand |> List.ofSeq), Set.ofList >> forCrib)
@@ -91,7 +97,7 @@ let private awaitingForCrib (fForCrib, player) = awaitingForCrib' {| fForCrib = 
 
 let private awaitingPeg' = React.memo ("AwaitingPeg", fun (props:{| fPeg : aval<(PegState * (Card option -> unit)) option> ; player : PlayerDetails |}) ->
     let fPeg = ReactHB.Hooks.useAdaptive props.fPeg
-    let worker, workerStatus = React.useWorker props.player.PegStrategyWorker
+    let worker, workerStatus = React.useWorker (props.player.PegStrategyWorker, fun options -> { options with Timeout = Some PEG_WORKER_TIMEOUT })
     let runWorker () =
         match fPeg with
         | Some (pegState, peg) when workerStatus <> WorkerStatus.Running && workerStatus <> WorkerStatus.Killed ->
@@ -149,8 +155,107 @@ let private awaitingNewGame' = React.functionComponent ("AwaitingNewGame", fun (
     | None -> Html.none)
 let private awaitingNewGame engine = awaitingNewGame' {| engine = engine |}
 
-let game = React.memo ("Game", fun () ->
-    let (gameDetails, setGameDetails) : GameDetails option * (GameDetails option -> unit) = React.useState (None)
+let private dealer' = React.functionComponent ("Dealer", fun (props:{| dealer : aval<Player> ; player1 : PlayerDetails ; player2 : PlayerDetails ; showToast : Toaster.ToastData -> unit |}) ->
+    let dealer = ReactHB.Hooks.useAdaptive props.dealer
+    let showToast () =
+        let name = function | Player1 -> props.player1.Name | Player2 -> props.player2.Name
+        let icon = function | Player1 -> Toaster.Computer | Player2 -> Toaster.Human // TODO-NMB: Should obtain from PlayerDetails...
+        let data : Toaster.ToastData = {
+            Title = Some "New deal"
+            Icon = Some (icon dealer)
+            Message = sprintf "%s is the dealer" (name dealer)
+            Purpose = Toaster.Success
+            Affinity = None
+            TimeoutOverride = None }
+        data |> props.showToast
+    React.useEffect (showToast, [| box dealer |])
+    Html.none)
+let private dealer dealer player1 player2 showToast = dealer' {| dealer = dealer ; player1 = player1 ; player2 = player2 ; showToast = showToast |}
+
+let private nibsScoreEvent' = React.functionComponent ("NibsScoreEvent", fun (props:{| e : IEvent<Player * Card * NibsScoreEvent> ; player1 : PlayerDetails ; player2 : PlayerDetails ; showToast : Toaster.ToastData -> unit |}) ->
+    let subscribe () =
+        let handler (player, cutCard, event:NibsScoreEvent) =
+            let name = function | Player1 -> props.player1.Name | Player2 -> props.player2.Name
+            let data : Toaster.ToastData = {
+                Title = Some "Cut"
+                Icon = Some Toaster.Score
+                Message = sprintf "%s -> %s scores %s" (cardText cutCard) (name player) event.Text
+                Purpose = Toaster.Information
+                Affinity = Some player
+                TimeoutOverride = None }
+            data |> props.showToast
+        props.e.Add handler
+    React.useEffect (subscribe, [| |])
+    Html.none)
+let private nibsScoreEvent e player1 player2 showToast = nibsScoreEvent' {| e = e ; player1 = player1 ; player2 = player2 ; showToast = showToast |}
+
+let private peggingScoreEvent' = React.functionComponent ("PeggingScoreEvent", fun (props:{| e : IEvent<Player * option<Card> * CardL * list<PeggingScoreEvent>> ; player1 : PlayerDetails ; player2 : PlayerDetails ; showToast : Toaster.ToastData -> unit |}) ->
+    let subscribe () =
+        let handler (player, card, pegged, events:PeggingScoreEvent list) =
+            let name = function | Player1 -> props.player1.Name | Player2 -> props.player2.Name
+            let played = match card with | Some card -> Some (cardText card, (fst card).PipValue) | None -> None
+            let score = events |> List.sumBy (fun event -> event.Score)
+            let message =
+                match played with
+                | Some (played, pipValue)  ->
+                    let runningTotal = pips pegged + pipValue
+                    let previous = match pegged |> List.map cardText with | h :: t -> sprintf "(%s) " (h :: t |> String.concat " ") | [] -> ""
+                    sprintf "%s plays %s%s = %i -> scores %i" (name player) previous played runningTotal score
+                | None -> sprintf "%s claims a go -> scores %i" (name player) score
+            // TODO-NMB: More details, e.g. each event.Text (cf. game-player.fs)?...
+            let data : Toaster.ToastData = {
+                Title = Some "Pegging"
+                Icon = Some Toaster.Score
+                Message = message
+                Purpose = Toaster.Information
+                Affinity = Some player
+                TimeoutOverride = None }
+            data |> props.showToast
+        props.e.Add handler
+    React.useEffect (subscribe, [| |])
+    Html.none)
+let private peggingScoreEvent e player1 player2 showToast = peggingScoreEvent' {| e = e ; player1 = player1 ; player2 = player2 ; showToast = showToast |}
+
+let private handScoreEvent' = React.functionComponent ("HandScoreEvent", fun (props:{| e : IEvent<Player * Hand * Card * list<HandScoreEvent>> ; player1 : PlayerDetails ; player2 : PlayerDetails ; showToast : Toaster.ToastData -> unit |}) ->
+    let subscribe () =
+        let handler (player, hand, card, events:HandScoreEvent list) =
+            let name = function | Player1 -> props.player1.Name | Player2 -> props.player2.Name
+            let score = events |> List.sumBy (fun event -> event.Score)
+            // TODO-NMB: More details, e.g. each event.Text (cf. game-player.fs)?...
+            let data : Toaster.ToastData = {
+                Title = Some "Hand"
+                Icon = Some Toaster.Score
+                Message = sprintf "%s scores %i" (name player) score
+                Purpose = Toaster.Information
+                Affinity = Some player
+                TimeoutOverride = None }
+            data |> props.showToast
+        props.e.Add handler
+    React.useEffect (subscribe, [| |])
+    Html.none)
+let private handScoreEvent e player1 player2 showToast = handScoreEvent' {| e = e ; player1 = player1 ; player2 = player2 ; showToast = showToast |}
+
+let private cribScoreEvent' = React.functionComponent ("CribScoreEvent", fun (props:{| e : IEvent<Player * Hand * Card * list<CribScoreEvent>> ; player1 : PlayerDetails ; player2 : PlayerDetails ; showToast : Toaster.ToastData -> unit |}) ->
+    let subscribe () =
+        let handler (player, hand, card, events:CribScoreEvent list) =
+            let name = function | Player1 -> props.player1.Name | Player2 -> props.player2.Name
+            let score = events |> List.sumBy (fun event -> event.Score)
+            // TODO-NMB: More details, e.g. each event.Text (cf. game-player.fs)?...
+            let data : Toaster.ToastData = {
+                Title = Some "Crib"
+                Icon = Some Toaster.Score
+                Message = sprintf "%s scores %i" (name player) score
+                Purpose = Toaster.Information
+                Affinity = Some player
+                TimeoutOverride = None }
+            data |> props.showToast
+        props.e.Add handler
+    React.useEffect (subscribe, [| |])
+    Html.none)
+let private cribScoreEvent e player1 player2 showToast = cribScoreEvent' {| e = e ; player1 = player1 ; player2 = player2 ; showToast = showToast |}
+
+let private game' = React.memo ("Game", fun (props:{| showToast : Toaster.ToastData -> unit |}) ->
+    let gameDetails, setGameDetails : GameDetails option * (GameDetails option -> unit) = React.useState (None)
     (* IMPORTANT NOTE: Do *not* call "Theme.useStyles ()" as this causes a re-render (despite memo-ization) when light/dark theme changed - which seems to screw up state / adaptive stuff. *)
     match gameDetails with
     | Some gameDetails ->
@@ -171,6 +276,11 @@ let game = React.memo ("Game", fun () ->
                 awaitingNewDeal (gameDetails.GameEngine.AwaitingNewDeal(Player1), gameDetails.Player1Details)
                 awaitingNewDeal (gameDetails.GameEngine.AwaitingNewDeal(Player2), gameDetails.Player2Details)
                 awaitingNewGame gameDetails.GameEngine
+                dealer gameDetails.GameEngine.Dealer gameDetails.Player1Details gameDetails.Player2Details props.showToast
+                nibsScoreEvent gameDetails.GameEngine.NibsScoreEvent gameDetails.Player1Details gameDetails.Player2Details props.showToast
+                peggingScoreEvent gameDetails.GameEngine.PeggingScoreEvent gameDetails.Player1Details gameDetails.Player2Details props.showToast
+                handScoreEvent gameDetails.GameEngine.HandScoreEvent gameDetails.Player1Details gameDetails.Player2Details props.showToast
+                cribScoreEvent gameDetails.GameEngine.CribScoreEvent gameDetails.Player1Details gameDetails.Player2Details props.showToast
         ] ]
     | None ->
         // TODO-NMB: UI to enter name | select opponent skill level | &c. | ...
@@ -183,3 +293,4 @@ let game = React.memo ("Game", fun () ->
         setGameDetails (Some gameDetails)
         Html.h1 [
             Html.text "Starting new game..." ])
+let game showToast = game' {| showToast = showToast |}

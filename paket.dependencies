@@ -45,7 +45,7 @@ group ui
 	nuget Fable.MaterialUI.Icons
 	nuget Fable.MaterialUI.MaterialDesignIcons
     nuget Feliz
-	nuget Feliz.ElmishComponents
     nuget Feliz.MaterialUI
     nuget Feliz.UseWorker ~> 0.4.2 // pinned because 0.5.0 requires Feliz >= 1.5.0 but no such version exists
+	nuget Thoth.Elmish.Toast
     // github krauthaufen/Fable.Elmish.Adaptive // using copies of relevant files instead because requires Fable.Promise < 2.1.0 but Feliz.UseWorker requires Fable.Promise >= 2.1.0

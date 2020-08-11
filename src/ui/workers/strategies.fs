@@ -23,7 +23,7 @@ let private fromAnon (anon:{| previouslyPegged : Pegged list ; pegged : Pegged ;
     SelfCrib = anon.selfCrib |> Set.ofList
     IsDealer = anon.isDealer }
 
-// Note: option<Card> also problematic - so hack around this.
+// Note: option<Card> also seems to be problematic - so hack around this.
 
 let private mungeOption = function | Some card -> true, card | None -> false, (Ace, Spade) // relies on consuming code ignoring Card when false
 

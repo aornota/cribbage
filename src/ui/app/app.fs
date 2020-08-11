@@ -1,6 +1,7 @@
 module Aornota.Cribbage.Ui.App
 
-open Browser.Dom
+open Elmish
+open Elmish.React
 
 open Fable.MaterialUI.MaterialDesignIcons
 
@@ -10,6 +11,12 @@ module ReactHB = Fable.React.HookBindings
 open Feliz
 open Feliz.MaterialUI
 
+open Thoth.Elmish
+
+type private Msg = | ShowToast of Toaster.ToastData
+
+type private State = unit
+
 let [<Literal>] private CRIBBAGE = "cribbage"
 
 // *pre-α" | α | β | γ | δ | ε | ζ | η | θ | ι | κ | λ | μ | ν | ξ | ο | π | ρ | σ | τ | υ | φ | χ | ψ | ω
@@ -18,6 +25,10 @@ let [<Literal>] private CRIBBAGE_VERSION = "pre-α" // note: keep synchronized w
 let [<Literal>] private CRIBBAGE_LOGO = "tpoc-32x32.png"
 
 let [<Literal>] private CRIBBAGE_REPO = "https://github.com/aornota/cribbage"
+
+let private init () : State * Cmd<Msg> = (), Cmd.none
+
+let private transition msg state : State * Cmd<Msg> = match msg with | ShowToast data -> state, Toaster.makeCmd data
 
 let private appBar' = React.functionComponent ("AppBar", fun (props:{| useDarkThemeSetting : bool option ; prefersDarkTheme : bool |}) ->
     let c = Theme.useStyles ()
@@ -50,7 +61,7 @@ let private appBar' = React.functionComponent ("AppBar", fun (props:{| useDarkTh
                             | None -> "Using default theme")
                         tooltip.children (
                             Mui.iconButton [
-                                prop.onClick (fun _ -> Settings.toggleUseDarkTheme props.prefersDarkTheme)
+                                prop.onClick (fun _ -> Storage.toggleUseDarkTheme props.prefersDarkTheme)
                                 iconButton.color.inherit'
                                 iconButton.children [
                                     match props.useDarkThemeSetting with
@@ -68,9 +79,9 @@ let private appBar' = React.functionComponent ("AppBar", fun (props:{| useDarkTh
                                 iconButton.children [ githubCircleIcon [] ] ]) ] ] ] ] ])
 let private appBar (useDarkThemeSetting, prefersDarkTheme) = appBar' {| useDarkThemeSetting = useDarkThemeSetting ; prefersDarkTheme = prefersDarkTheme |}
 
-let private app = React.functionComponent ("App", fun () ->
+let private app' = React.functionComponent ("App", fun (props:{| dispatch : Msg -> unit |}) ->
     let prefersDarkTheme = Hooks.useMediaQuery "@media (prefers-color-scheme: dark)"
-    let useDarkThemeSetting = ReactHB.Hooks.useAdaptive Settings.useDarkTheme
+    let useDarkThemeSetting = ReactHB.Hooks.useAdaptive Storage.useDarkTheme
     let useDarkTheme = useDarkThemeSetting |> Option.defaultValue prefersDarkTheme
     let theme = Theme.getTheme useDarkTheme
     let c = Theme.useStyles ()
@@ -85,6 +96,15 @@ let private app = React.functionComponent ("App", fun () ->
                     Html.main [
                         prop.className c.content
                         prop.children [
-                            Game.game () ] ] ] ] ] ])
+                            Game.game (React.useCallback (ShowToast >> props.dispatch)) ] ] ] ] ] ])
+let private app dispatch = app' {| dispatch = dispatch |}
 
-ReactDOM.render (app (), document.getElementById "app") // needs to match id of div in index.html
+let private render (_:State) (dispatch:Msg -> unit) = app dispatch
+
+Program.mkProgram init transition render
+|> Toast.Program.withToast Toaster.render
+|> Program.withReactSynchronous "app" // needs to match id of div in index.html
+#if CONSOLE_TRACE
+|> Program.withConsoleTrace
+#endif
+|> Program.run
