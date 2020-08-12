@@ -9,21 +9,24 @@ open Feliz.MaterialUI
 type private AppTheme = {
     PaletteType : PaletteType
     Primary : string
-    Secondary : string
     PrimaryContrastText : string
+    Secondary : string
+    SecondaryContrastText : string
     Error : string }
     with
     static member Dark = {
         PaletteType = PaletteType.Dark
-        Primary = "#504030"
+        Primary = "#28a"
         PrimaryContrastText = "#fff"
-        Secondary = "#304050"
+        Secondary = "#a82"
+        SecondaryContrastText = "#fff"
         Error = "#f00" }
     static member Light = {
         PaletteType = PaletteType.Light
-        Primary = "#cfdfef"
+        Primary = "#7df"
         PrimaryContrastText = "#000"
-        Secondary = "#efdfcf"
+        Secondary = "#fd7"
+        SecondaryContrastText = "#000"
         Error = "#f00" }
 
 let private defaultTheme = Styles.createMuiTheme ()
@@ -36,9 +39,12 @@ let private buildTheme (appTheme:AppTheme) = Styles.createMuiTheme ([
     theme.palette.primary'.main appTheme.Primary
     theme.palette.primary'.contrastText appTheme.PrimaryContrastText
     theme.palette.secondary'.main appTheme.Secondary
+    theme.palette.secondary'.contrastText appTheme.SecondaryContrastText
     theme.palette.error'.main appTheme.Error
 
-    theme.overrides.muiPaper.elevation2 [
+    // TODO-NMB: Overrides?...
+
+    (* theme.overrides.muiPaper.elevation2 [
         style.custom ("box-shadow", defaultTheme.shadows.[8])
         if isDarkTheme then style.backgroundColor "#303030"
         else style.backgroundColor defaultTheme.palette.background.``default`` ]
@@ -53,46 +59,7 @@ let private buildTheme (appTheme:AppTheme) = Styles.createMuiTheme ([
         else style.backgroundColor (defaultTheme.palette.background.``default`` + "!important") ]
     theme.overrides.muiTable.root [
         if isDarkTheme then style.backgroundColor "#303030 !important"
-        else style.backgroundColor (defaultTheme.palette.background.``default`` + "!important") ] ])
+        else style.backgroundColor (defaultTheme.palette.background.``default`` + "!important") ] *)
+    ])
 
 let getTheme isDark = buildTheme (if isDark then AppTheme.Dark else AppTheme.Light)
-
-let useStyles : unit -> _ = Styles.makeStyles (fun styles (theme:Theme) ->
-    (* let drawerWidth = 200 *)
-    {|
-        appBar = styles.create [
-            style.zIndex (theme.zIndex.drawer + 1)
-            style.cursor "default"
-            style.display.grid ]
-        (* containerCard = styles.create [ style.padding (length.em 1) ] *)
-        contentCard = styles.create [ style.height (length.percent 100) ]
-        content = styles.create [
-            style.flexGrow 1
-            style.height.inheritFromParent
-            style.paddingTop (length.em 6)
-            style.paddingLeft (length.em 2)
-            style.paddingRight (length.em 2)
-            style.paddingBottom (length.em 1) ]
-        (* drawer = styles.create [
-            style.zIndex theme.zIndex.drawer
-            style.width drawerWidth
-            style.flexShrink 0 ]
-        drawerPaper = styles.create [ style.width drawerWidth ]
-        fullSizeCard = styles.create [
-            style.paddingTop (length.em 1)
-            style.paddingBottom (length.em 1)
-            style.paddingLeft (length.em 5)
-            style.paddingRight (length.em 5)
-            style.flexGrow 1 ] *)
-        root = styles.create [
-            style.display.flex
-            style.height.inheritFromParent
-            style.userSelect.none ]
-        (* sampleApp = styles.create [
-            style.paddingTop (length.em 2)
-            style.paddingBottom (length.em 2) ]
-        mtBackground = styles.create [ style.backgroundColor theme.palette.background.``default`` ] *)
-        title = styles.create [ style.width (length.percent 100) ]
-        toolbar = styles.create [ yield! theme.mixins.toolbar ]
-        (* unselectable = styles.create [ style.userSelect.none ] *)
-    |})

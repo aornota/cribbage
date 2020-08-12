@@ -31,18 +31,18 @@ let private init () : State * Cmd<Msg> = (), Cmd.none
 let private transition msg state : State * Cmd<Msg> = match msg with | ShowToast data -> state, Toaster.makeCmd data
 
 let private appBar' = React.functionComponent ("AppBar", fun (props:{| useDarkThemeSetting : bool option ; prefersDarkTheme : bool |}) ->
-    let c = Theme.useStyles ()
     Mui.appBar [
-        appBar.classes.root c.appBar
-        appBar.color.secondary
+        appBar.color.default'
         appBar.position.fixed'
+        prop.style [
+            style.display.grid
+            style.cursor "default" ]
         appBar.children [
             Mui.toolbar [
-                toolbar.classes.root c.toolbar
                 toolbar.children [
                     Mui.typography [
-                        typography.classes.root c.title
                         typography.variant.h6
+                        prop.style [ style.width (length.percent 100) ]
                         typography.children [
                             Html.img [
                                 prop.style [ style.verticalAlign.middle ]
@@ -84,19 +84,28 @@ let private app' = React.functionComponent ("App", fun (props:{| dispatch : Msg 
     let useDarkThemeSetting = ReactHB.Hooks.useAdaptive Storage.useDarkTheme
     let useDarkTheme = useDarkThemeSetting |> Option.defaultValue prefersDarkTheme
     let theme = Theme.getTheme useDarkTheme
-    let c = Theme.useStyles ()
     Mui.themeProvider [
         themeProvider.theme theme
         themeProvider.children [
             Html.div [
-                prop.className c.root
+                prop.style [
+                    style.display.flex
+                    style.height.inheritFromParent
+                    style.userSelect.none ]
                 prop.children [
                     Mui.cssBaseline []
                     appBar (useDarkThemeSetting, prefersDarkTheme)
                     Html.main [
-                        prop.className c.content
+                        prop.style [
+                            style.height.inheritFromParent
+                            style.flexGrow 1
+                            style.paddingTop (length.em 6)
+                            style.paddingLeft (length.em 2)
+                            style.paddingRight (length.em 2)
+                            style.paddingBottom (length.em 1) ]
                         prop.children [
-                            Game.game (React.useCallback (ShowToast >> props.dispatch)) ] ] ] ] ] ])
+                            // TEMP-NMB...Game.game (React.useCallback (ShowToast >> props.dispatch)) ] ] ] ] ] ])
+                            Game.game (React.useCallback ignore) ] ] ] ] ] ])
 let private app dispatch = app' {| dispatch = dispatch |}
 
 let private render (_:State) (dispatch:Msg -> unit) = app dispatch

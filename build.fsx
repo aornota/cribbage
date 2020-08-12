@@ -60,10 +60,16 @@ let private createMissingAppSettingsForDevelopment dir =
         Shell.copyFile requiredSettings (Path.combine dir productionSettings)
         Trace.traceImportant (sprintf "WARNING -> %s did not exist and has been copied from %s; it will most likely need to be modified" requiredSettings productionSettings)
 
+let private run () =
+    let ui = async { runTool yarnTool "webpack-dev-server" __SOURCE_DIRECTORY__ }
+    let browser = async {
+        do! Async.Sleep 2500
+        openBrowser "http://localhost:8080" }
+    Async.Parallel [ ui ; browser ] |> Async.RunSynchronously |> ignore
+
 Target.create "clean-ui" (fun _ ->
     !! (uiDir </> "bin")
     ++ (uiDir </> "obj")
-    ++ (uiDir </> "public/Workers")
     ++ uiPublishDir
     |> Seq.iter Shell.cleanDir)
 
@@ -73,14 +79,13 @@ Target.create "restore-ui" (fun _ ->
     runTool yarnTool "install --frozen-lockfile" __SOURCE_DIRECTORY__
     runDotNet "restore" uiDir)
 
-Target.create "build-workers" (fun _ -> runTool yarnTool "webpack-cli --config src/ui/workers/webpack.config.js" __SOURCE_DIRECTORY__)
+Target.create "clean-ui-workers" (fun _ -> Shell.cleanDir (uiDir </> "public/workers"))
 
-Target.create "run" (fun _ ->
-    let ui = async { runTool yarnTool "webpack-dev-server" __SOURCE_DIRECTORY__ }
-    let browser = async {
-        do! Async.Sleep 2500
-        openBrowser "http://localhost:8080" }
-    Async.Parallel [ ui ; browser ] |> Async.RunSynchronously |> ignore)
+Target.create "build-ui-workers" (fun _ -> runTool yarnTool "webpack-cli --config src/ui/workers/webpack.config.js" __SOURCE_DIRECTORY__)
+
+Target.create "run" (fun _ -> run ())
+
+Target.create "run-with-build-ui-workers" (fun _ -> run ())
 
 Target.create "build" (fun _ -> runTool yarnTool "webpack-cli -p" __SOURCE_DIRECTORY__)
 
@@ -102,17 +107,20 @@ Target.create "run-tests" (fun _ -> runDotNet "run -c Release" testsDir)
 
 Target.create "help" (fun _ ->
     printfn "\nThese useful build targets can be run via 'fake build -t {target}':"
-    printfn "\n\trun -> builds, runs and watches [non-production] ui (served via webpack-dev-server)"
-    printfn "\n\tbuild -> builds [production] ui (which writes output to .\\src\\ui\\publish)"
-    printfn "\n\tpublish-gh-pages -> builds [production] ui, then pushes to gh-pages branch"
+    printfn "\n\trun -> builds, runs and watches [non-production] ui (served via webpack-dev-server) but does *not* (re)build ui-workers"
+    printfn "\n\trun-with-build-ui-workers -> builds, runs and watches [non-production] ui (served via webpack-dev-server) *and* builds [production] ui-workers"
+    printfn "\n\tbuild -> builds [production] ui *and* ui-workers (which writes output to .\\src\\ui\\publish)"
+    printfn "\n\tpublish-gh-pages -> builds [production] ui *and* ui-workers, then pushes to gh-pages branch"
     printfn "\n\trun-dev-console -> builds and runs [Debug] dev-console"
     printfn "\n\trun-tests -> builds and runs [Release] tests"
     printfn "\n\thelp -> shows this list of build targets\n")
 
-"clean-ui" ==> "restore-ui" ==> "build-workers"
+"clean-ui" ==> "restore-ui" ==> "clean-ui-workers" ==> "build-ui-workers"
 
-"build-workers" ==> "run"
-"build-workers" ==> "build" ==> "publish-gh-pages"
+"restore-ui" ==> "run"
+"build-ui-workers" ==> "run-with-build-ui-workers"
+
+"build-ui-workers" ==> "build" ==> "publish-gh-pages"
 
 // TODO-NMB: Reinstate?..."run-tests" ==> "run-dev-console"
 

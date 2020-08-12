@@ -31,7 +31,8 @@ Before first run:
 
 Build targets:
 
-- Run/watch for development (Debug): _fake build -t run_
+- Run/watch for development (Debug) without (re)building web workers: _fake build -t run_
+- Run/watch for development (Debug) including (re)building web workers: _fake build -t run-with-build-ui-workers_
 - Build for production (Release): or _fake build -t build_
 - Publish to gh-pages (Release): _fake build -t publish-gh-pages_
 - Run the dev console (Debug): _fake build -t run-dev-console_ (or just _fake build_)
