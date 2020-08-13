@@ -16,16 +16,16 @@ type private AppTheme = {
     with
     static member Dark = {
         PaletteType = PaletteType.Dark
-        Primary = "#28a"
-        PrimaryContrastText = "#fff"
-        Secondary = "#a82"
-        SecondaryContrastText = "#fff"
+        Primary = "#64ffda"
+        PrimaryContrastText = "#000"
+        Secondary = "#ffd600"
+        SecondaryContrastText = "#000"
         Error = "#f00" }
     static member Light = {
         PaletteType = PaletteType.Light
-        Primary = "#7df"
-        PrimaryContrastText = "#000"
-        Secondary = "#fd7"
+        Primary = "#2e7d32"
+        PrimaryContrastText = "#fff"
+        Secondary = "#ff8f00"
         SecondaryContrastText = "#000"
         Error = "#f00" }
 

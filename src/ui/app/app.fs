@@ -34,9 +34,7 @@ let private appBar' = React.functionComponent ("AppBar", fun (props:{| useDarkTh
     Mui.appBar [
         appBar.color.default'
         appBar.position.fixed'
-        prop.style [
-            style.display.grid
-            style.cursor "default" ]
+        prop.style [ style.display.grid ; style.cursor "default" ]
         appBar.children [
             Mui.toolbar [
                 toolbar.children [
@@ -74,6 +72,7 @@ let private appBar' = React.functionComponent ("AppBar", fun (props:{| useDarkTh
                             Mui.iconButton [
                                 prop.href CRIBBAGE_REPO
                                 prop.custom ("target", "_blank")
+                                prop.custom ("rel", "noopener")
                                 iconButton.component' "a"
                                 iconButton.color.inherit'
                                 iconButton.children [ githubCircleIcon [] ] ]) ] ] ] ] ])
@@ -88,10 +87,7 @@ let private app' = React.functionComponent ("App", fun (props:{| dispatch : Msg 
         themeProvider.theme theme
         themeProvider.children [
             Html.div [
-                prop.style [
-                    style.display.flex
-                    style.height.inheritFromParent
-                    style.userSelect.none ]
+                prop.style [ style.display.flex ; style.height.inheritFromParent ; style.userSelect.none ]
                 prop.children [
                     Mui.cssBaseline []
                     appBar (useDarkThemeSetting, prefersDarkTheme)

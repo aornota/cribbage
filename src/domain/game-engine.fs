@@ -616,9 +616,7 @@ type GameEngine(player1Name:string, player2Name:string) =
 #else
     do agent.Error.Add (fun exn -> sourcedLogger.Error("Unexpected error -> {message}", exn.Message))
 #endif
-    member _.PlayerNames = player1Name, player2Name
     member _.Scores = gameState |> AVal.map (fun gameState -> gameState.Scores)
-    member _.Dealer = gameState |> AVal.map (fun gameState -> gameState.CurrentDeal.Dealer)
     member _.Crib = gameState |> AVal.map (fun gameState ->
         let dealerForCrib, nonDealerForCrib = gameState.CurrentDeal.DealerForCrib, gameState.CurrentDeal.NonDealerForCrib
         match dealerForCrib.Count, nonDealerForCrib.Count with
@@ -629,6 +627,7 @@ type GameEngine(player1Name:string, player2Name:string) =
             let crib = addToCrib (Set.empty, dealerForCrib)
             Some (addToCrib (crib, nonDealerForCrib)))
     member _.CutCard = gameState |> AVal.map (fun gameState -> gameState.CurrentDeal.CutCard)
+    member _.IsDealer(player) = gameState |> AVal.map (fun gameState -> if gameState.CurrentDeal.Dealer = player then Some (gameState.PreviousDeals.Length + 1) else None)
     member _.AwaitingForCrib(player) =
         (if player = Player1 then awaitingForCribPlayer1 else awaitingForCribPlayer2)
         |> AVal.map (fun awaiting ->
