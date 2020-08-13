@@ -20,14 +20,14 @@ type private AppTheme = {
         PrimaryContrastText = "#000"
         Secondary = "#ffd600"
         SecondaryContrastText = "#000"
-        Error = "#f00" }
+        Error = "#f22" }
     static member Light = {
         PaletteType = PaletteType.Light
         Primary = "#2e7d32"
         PrimaryContrastText = "#fff"
         Secondary = "#ff8f00"
         SecondaryContrastText = "#000"
-        Error = "#f00" }
+        Error = "#d00" }
 
 let private defaultTheme = Styles.createMuiTheme ()
 

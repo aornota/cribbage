@@ -95,6 +95,7 @@ let private awaitingForCrib' = React.functionComponent ("AwaitingForCrib", fun (
     | None -> Html.none)
 let private awaitingForCrib (fForCrib, player) = awaitingForCrib' {| fForCrib = fForCrib ; player = player |}
 
+// TODO-NMB: Why is this React.memo rather than React.functionComponent?...
 let private awaitingPeg' = React.memo ("AwaitingPeg", fun (props:{| fPeg : aval<(PegState * (Card option -> unit)) option> ; player : PlayerDetails |}) ->
     let fPeg = ReactHB.Hooks.useAdaptive props.fPeg
     let worker, workerStatus = React.useWorker (props.player.PegStrategyWorker, fun options -> { options with Timeout = Some PEG_WORKER_TIMEOUT })
