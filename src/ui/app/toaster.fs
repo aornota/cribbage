@@ -74,7 +74,7 @@ let render = {
                 messageElement ] ]
     member __.Message message =
         Mui.typography [
-            typography.variant.body2
+            typography.variant.body1
             typography.children [
                 Html.text message ] ]
     member __.SplittedLayout iconElement titleElement messageElement =

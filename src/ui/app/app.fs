@@ -99,9 +99,7 @@ let private app' = React.functionComponent ("App", fun (props:{| dispatch : Msg 
                             style.paddingLeft (length.em 2)
                             style.paddingRight (length.em 2)
                             style.paddingBottom (length.em 1) ]
-                        prop.children [
-                            // TEMP-NMB...Game.game (React.useCallback (ShowToast >> props.dispatch)) ] ] ] ] ] ])
-                            Game.game (React.useCallback ignore) ] ] ] ] ] ])
+                        prop.children [ Game.game (React.useCallback (ShowToast >> props.dispatch)) ] ] ] ] ] ])
 let private app dispatch = app' {| dispatch = dispatch |}
 
 let private render (_:State) (dispatch:Msg -> unit) = app dispatch

@@ -50,7 +50,7 @@ type private GameDetails = {
 let [<Literal>] private FOR_CRIB_WORKER_TIMEOUT = 10000
 let [<Literal>] private PEG_WORKER_TIMEOUT = 5000
 
-let [<Literal>] private SLEEP = 1000
+let [<Literal>] private SLEEP = 1
 
 let private toAnon (pegState:PegState) = {|
     previouslyPegged = pegState.PreviouslyPegged
@@ -82,19 +82,6 @@ let private name' = React.memo ("Name", fun (props:{| name : string ; isInteract
                 prop.style [ style.verticalAlign.middle ; style.marginLeft (length.em 0.5) ]
                 icon.children [ if props.isInteractive then humanIcon [] else robotIcon [] ] ] ] ])
 let private name name isInteractive = name' {| name = name ; isInteractive = isInteractive |}
-
-let private isDealer' = React.functionComponent ("IsDealer", fun (props:{| isDealer : aval<int option> ; isInteractive : bool |}) ->
-    let isDealer = ReactHB.Hooks.useAdaptive props.isDealer
-    match isDealer with
-    | Some deal ->
-        Html.div [
-            prop.style [ style.display.flex ; style.justifyContent.center ; style.marginTop (length.em 0.5) ]
-            prop.children [
-                Mui.chip [
-                    if props.isInteractive then chip.color.primary else chip.color.secondary
-                    chip.label (sprintf "Dealer for hand #%i" deal) ] ] ]
-    | None -> Html.none)
-let private isDealer isDealer isInteractive = isDealer' {| isDealer = isDealer ; isInteractive = isInteractive |}
 
 let private forCribI' = React.functionComponent ("ForCribInteractive", fun (props:{| awaitingForCrib : aval<(IsDealer * Hand * (CardS -> unit)) option> |}) ->
     let awaitingForCrib = ReactHB.Hooks.useAdaptive props.awaitingForCrib
@@ -176,9 +163,9 @@ let private pegNI' = React.functionComponent ("PegNonInteractive", fun (props:{|
     let worker, workerStatus = React.useWorker (props.pegWorker, fun options -> { options with Timeout = Some PEG_WORKER_TIMEOUT })
     // TODO-NMB: Not async?...
     let runWorker () = async {
-        do! Async.Sleep SLEEP
         match awaitingPeg with
         | Some (pegState, peg) when workerStatus <> WorkerStatus.Running && workerStatus <> WorkerStatus.Killed ->
+            do! Async.Sleep SLEEP
             // Note: option<Card> also problematic - so hack around this.
             worker.exec (toAnon pegState, (fun (isSome, (rank, suit)) -> peg (if isSome then Some (rank, suit) else None)))
         | Some _ -> Browser.Dom.console.log "Should never happen: pegNI' runWorker () when Some awaitingPeg but worker neither Running nor Killed"
@@ -247,55 +234,26 @@ let private cannotPegNI awaitingCannotPeg = cannotPegNI' {| awaitingCannotPeg = 
 
 let private newDealNI' = React.functionComponent ("NewDealNonInteractive", fun (props:{| awaitingNewDeal : aval<(unit -> unit) option> |}) ->
     let awaitingNewDeal = ReactHB.Hooks.useAdaptive props.awaitingNewDeal
-    let newDeal () = async {
-        do! Async.Sleep SLEEP
-        match awaitingNewDeal with | Some awaitingNewDeal -> awaitingNewDeal () | None -> () }
-    React.useEffect (newDeal >> Async.StartImmediate, [| box awaitingNewDeal |])
-    match awaitingNewDeal with
-    | Some _ ->
-        // TODO-NMB: What to display here?...
-        Html.div [
-            prop.style [ style.display.flex ; style.justifyContent.center ; style.marginTop (length.em 0.75) ]
-            prop.children [
-                Mui.typography [
-                    typography.variant.body1
-                    typography.color.textSecondary
-                    typography.children [ Html.text "New deal..." ] ]
-                Mui.circularProgress [
-                    circularProgress.variant.indeterminate
-                    circularProgress.size (length.em 1.5)
-                    circularProgress.color.secondary
-                    prop.style [ style.marginLeft (length.em 0.75) ] ] ] ]
-    | None -> Html.none)
+    let newDeal () = match awaitingNewDeal with | Some awaitingNewDeal -> awaitingNewDeal () | None -> ()
+    React.useEffect (newDeal, [| box awaitingNewDeal |])
+    Html.none)
 let private newDealNI awaitingNewDeal = newDealNI' {| awaitingNewDeal = awaitingNewDeal |}
 
 let private newGameNI' = React.functionComponent ("NewGameNonInteractive", fun (props:{| awaitingNewGame : aval<(unit -> unit) option> |}) ->
     let awaitingNewGame = ReactHB.Hooks.useAdaptive props.awaitingNewGame
+    // TODO-NMB: No need for async/sleep [only used for monitoring during development]...
     let newGame () = async {
-        do! Async.Sleep SLEEP
+        do! Async.Sleep 2500
         match awaitingNewGame with | Some awaitingNewGame -> awaitingNewGame () | None -> () }
     React.useEffect (newGame >> Async.StartImmediate, [| box awaitingNewGame |])
-    match awaitingNewGame with
-    | Some _ ->
-        // TODO-NMB: What to display here?...
-        Html.div [
-            prop.style [ style.display.flex ; style.justifyContent.center ; style.marginTop (length.em 0.75) ]
-            prop.children [
-                Mui.typography [
-                    typography.variant.body1
-                    typography.color.textSecondary
-                    typography.children [ Html.text "New game..." ] ]
-                Mui.circularProgress [
-                    circularProgress.variant.indeterminate
-                    circularProgress.size (length.em 1.5)
-                    circularProgress.color.secondary
-                    prop.style [ style.marginLeft (length.em 0.75) ] ] ] ]
-    | None -> Html.none)
+    Html.none)
 let private newGameNI awaitingNewGame = newGameNI' {| awaitingNewGame = awaitingNewGame |}
 
 let private score' = React.functionComponent ("Score", fun (props:{| score : aval<int> ; isInteractive : bool |}) ->
     let score = ReactHB.Hooks.useAdaptive props.score
-    let progress = min (score * 100 / 121) 100
+    let progress1Max, progress2Max = 61, 121
+    let progress1 = if score >= progress1Max then 100 else score * 100 / progress1Max
+    let progress2 = if score <= progress1Max then 0 else min ((score - progress1Max) * 100 / (progress2Max - progress1Max)) 100
     React.fragment [
         Mui.typography [
             typography.variant.h3
@@ -305,11 +263,53 @@ let private score' = React.functionComponent ("Score", fun (props:{| score : ava
         Mui.linearProgress [
             linearProgress.variant.determinate
             if props.isInteractive then linearProgress.color.primary else linearProgress.color.secondary
-            linearProgress.value progress
-            prop.style [ style.height (length.em 0.5) ; style.marginBottom (length.em 0.75) ] ] ])
+            linearProgress.value progress1
+            prop.style [ style.height (length.em 0.33) ; style.marginBottom (length.em 0.33) ] ]
+        Mui.linearProgress [
+            linearProgress.variant.determinate
+            if props.isInteractive then linearProgress.color.primary else linearProgress.color.secondary
+            linearProgress.value progress2
+            prop.style [ style.height (length.em 0.33) ; style.marginBottom (length.em 0.75) ] ]
+    ])
 let private score score isInteractive = score' {| score = score ; isInteractive = isInteractive |}
 
-// TODO-NMB: Accordion/s for events...
+// TODO-NMB: Implement events - including clearing when deal changes (and auto-expanding behaviour depending on "what's changed"?)...
+let private isDealerAndScoreEvents' = React.functionComponent ("IsDealerAndScoreEvents", fun (props:{| isDealer : aval<int option> ; isInteractive : bool |}) ->
+    let isDealer = ReactHB.Hooks.useAdaptive props.isDealer
+    match isDealer with
+    | Some deal ->
+        Html.div [
+            prop.children [
+                Html.div [
+                    prop.style [ style.display.flex ; style.justifyContent.center ; style.marginTop (length.em 0.5) ]
+                    prop.children [
+                        Mui.chip [
+                            if props.isInteractive then chip.color.primary else chip.color.secondary
+                            chip.label (sprintf "Dealer for hand #%i" deal) ] ] ]
+                (* TEMP-NMB...
+                Html.div [
+                    prop.style [ style.display.flex ; style.justifyContent.center ; style.marginTop (length.em 0.5) ]
+                    prop.children [
+                        Mui.accordion [
+                            //?accordion.defaultExpanded true
+                            accordion.children [
+                                Mui.accordionSummary [
+                                    accordionSummary.disabled true
+                                    accordionSummary.expandIcon (chevronDownIcon [])
+                                    accordionSummary.children [
+                                        Mui.typography [ Html.text "Cut events" ] ] ]
+                                Mui.accordionDetails [
+                                    accordionDetails.children [
+                                        Mui.list [
+                                            list.dense true
+                                            list.disablePadding true
+                                            list.children [
+                                                Mui.listItem [
+                                                    listItem.children [
+                                                        Mui.listItemText [ listItemText.primary "2 for his nibs (Jc)" ] ] ] ] ] ] ] ] ] ] ] *)
+        ] ]
+    | None -> Html.none)
+let private isDealerAndScoreEvents isDealer isInteractive = isDealerAndScoreEvents' {| isDealer = isDealer ; isInteractive = isInteractive |}
 
 let private player' = React.memo ("Player", fun (props:{| player : PlayerDetails |}) ->
     let isInteractive, forCrib, peg, cannotPeg, newDeal, newGame =
@@ -344,40 +344,19 @@ let private player' = React.memo ("Player", fun (props:{| player : PlayerDetails
                         grid.item true
                         grid.children [
                             name props.player.Name isInteractive
-                            isDealer props.player.PlayerHooks.IsDealer isInteractive
                             forCrib
-                            // TODO-NMB: Hand (until pegging starts)?...
+                            // TODO-NMB: Pegging hand - if not own turn (and also before pegging starts, e.g. if waiting for opponent forCrib)...
                             peg
                             cannotPeg
-                            // TODO-NMB: Pegging hand (if not own turn)?...
+                            // TODO-NMB: Hand (once pegging completed) - and crib (if appropriate)...
                             newDeal
-                            newGame
-                            // TODO-NMB: More?...
-                            ] ]
+                            newGame ] ]
                     Mui.grid [
                         grid.xs._3
                         grid.item true
                         grid.children [
                             score props.player.PlayerHooks.Score isInteractive
-                            (* TEMP-NMB...
-                            Mui.accordion [
-                                //?accordion.defaultExpanded true
-                                accordion.children [
-                                    Mui.accordionSummary [
-                                        accordionSummary.disabled true
-                                        accordionSummary.expandIcon (chevronDownIcon [])
-                                        accordionSummary.children [
-                                            Mui.typography [ Html.text "Cut events" ] ] ]
-                                    Mui.accordionDetails [
-                                        accordionDetails.children [
-                                            Mui.list [
-                                                list.dense true
-                                                list.disablePadding true
-                                                list.children [
-                                                    Mui.listItem [
-                                                        listItem.children [
-                                                            Mui.listItemText [ listItemText.primary "2 for his nibs (Jc)" ] ] ] ] ] ] ] ] ] *)
-                        ] ] ] ] ] ])
+                            isDealerAndScoreEvents props.player.PlayerHooks.IsDealer isInteractive ] ] ] ] ] ])
 let private player player = player' {| player = player |}
 
 // TODO-NMB: "Shared" area (deck | crib | pegging | &c.)...
@@ -390,7 +369,7 @@ let private game' = React.memo ("Game", fun (props:{| showToast : Toaster.ToastD
         React.fragment [
             player gameDetails.Player1
             // TEMP-NMB...
-            Html.div [ prop.style [ style.height (length.em 6) ] ]
+            Html.div [ prop.style [ style.height (length.em 9) ] ]
             // ...TEMP-NMB
             player gameDetails.Player2
             // TODO-NMB: Statistics?...
@@ -420,11 +399,23 @@ let private game' = React.memo ("Game", fun (props:{| showToast : Toaster.ToastD
             //PlayerType = NonInteractive { ForCribWorker = Strategies.forCribRandomWorker ; PegWorker = Strategies.pegRandomWorker }
             PlayerHooks = hooks Player2 }
         let gameDetails = { Player1 = player1 ; Player2 = player2 ; GameEngine = engine }
-        engine.GameOverEvent.Add (fun gameSummary ->
-            // TODO-NMB: Toast? Statistics?...
-            transact (fun _ -> gameSummaries.Value <- gameSummary :: gameSummaries.Value))
+        engine.GameOverEvent.Add (fun summary ->
+            // TODO-NMB: Finesse toast - plus update statistics?...
+            transact (fun _ -> gameSummaries.Value <- summary :: gameSummaries.Value)
+            (* TEMP-NMB... *)
+            let winner = if summary.IsWinner(Player1) then Player1 else Player2
+            let isInteractive = function | Interactive -> true | NonInteractive _ -> false
+            let toast : Toaster.ToastData = {
+                Title = Some "Game over, man. Game over."
+                Icon = Some (if isInteractive (if winner = Player1 then player1.PlayerType else player2.PlayerType) then Toaster.Human else Toaster.Computer)
+                Message = sprintf "%s wins game #%i." (if winner = Player1 then player1.Name else player2.Name) gameSummaries.Value.Length
+                Purpose = Toaster.Information
+                Affinity = None
+                TimeoutOverride = None }
+            props.showToast toast
+            )
         (* async {
-            do! Async.Sleep SLEEP
+            do! Async.Sleep 1000
             setGameDetails (Some gameDetails) } |> Async.StartImmediate
         Mui.dialog [
             dialog.disableBackdropClick true
