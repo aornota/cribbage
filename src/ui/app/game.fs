@@ -50,8 +50,6 @@ type private GameDetails = {
 let [<Literal>] private FOR_CRIB_WORKER_TIMEOUT = 10000
 let [<Literal>] private PEG_WORKER_TIMEOUT = 5000
 
-let [<Literal>] private SLEEP = 1
-
 let private toAnon (pegState:PegState) = {|
     previouslyPegged = pegState.PreviouslyPegged
     pegged = pegState.Pegged
@@ -103,12 +101,15 @@ let private forCribI awaitingForCrib = forCribI' {| awaitingForCrib = awaitingFo
 let private forCribNI' = React.functionComponent ("ForCribNonInteractive", fun (props:{| awaitingForCrib : aval<(IsDealer * Hand * (CardS -> unit)) option> ; forCribWorker : WorkerFunc<IsDealer * CardL, CardL> |}) ->
     let awaitingForCrib = ReactHB.Hooks.useAdaptive props.awaitingForCrib
     let worker, workerStatus = React.useWorker (props.forCribWorker, fun options -> { options with Timeout = Some FOR_CRIB_WORKER_TIMEOUT })
-    let runWorker () =
+    // TODO-NMB: Np need for async - unless "monitoring" during development...
+    let runWorker () = async {
         match awaitingForCrib with
-        | Some (isDealer, hand, forCrib) when workerStatus <> WorkerStatus.Running && workerStatus <> WorkerStatus.Killed -> worker.exec ((isDealer, hand |> List.ofSeq), Set.ofList >> forCrib)
+        | Some (isDealer, hand, forCrib) when workerStatus <> WorkerStatus.Running && workerStatus <> WorkerStatus.Killed ->
+            do! Async.Sleep 2000
+            worker.exec ((isDealer, hand |> List.ofSeq), Set.ofList >> forCrib)
         | Some _ -> Browser.Dom.console.log "Should never happen: forCribNI' runWorker () when Some awaitingForCrib but worker neither Running nor Killed"
-        | None -> ()
-    React.useEffect (runWorker, [| box awaitingForCrib |])
+        | None -> () }
+    React.useEffect (runWorker >> Async.StartImmediate, [| box awaitingForCrib |])
     match awaitingForCrib with
     | Some (isDealer, hand, _) ->
         match workerStatus with
@@ -161,11 +162,11 @@ let private pegI awaitingPeg = pegI' {| awaitingPeg = awaitingPeg |}
 let private pegNI' = React.functionComponent ("PegNonInteractive", fun (props:{| awaitingPeg : aval<(PegState * (Card option -> unit)) option> ; pegWorker : WorkerFunc<{| previouslyPegged : Pegged list ; pegged : Pegged ; peggable : Card list ; notPeggable : Card list ; cutCard : Card ; selfCrib : Card list ; isDealer : IsDealer |}, bool * Card> |}) ->
     let awaitingPeg = ReactHB.Hooks.useAdaptive props.awaitingPeg
     let worker, workerStatus = React.useWorker (props.pegWorker, fun options -> { options with Timeout = Some PEG_WORKER_TIMEOUT })
-    // TODO-NMB: Not async?...
+    // TODO-NMB: Np need for async - unless "monitoring" during development...
     let runWorker () = async {
         match awaitingPeg with
         | Some (pegState, peg) when workerStatus <> WorkerStatus.Running && workerStatus <> WorkerStatus.Killed ->
-            do! Async.Sleep SLEEP
+            do! Async.Sleep (match pegState.Peggable.Count with | 0 -> 500 | 1 -> 1500 | _ -> 3000)
             // Note: option<Card> also problematic - so hack around this.
             worker.exec (toAnon pegState, (fun (isSome, (rank, suit)) -> peg (if isSome then Some (rank, suit) else None)))
         | Some _ -> Browser.Dom.console.log "Should never happen: pegNI' runWorker () when Some awaitingPeg but worker neither Running nor Killed"
@@ -211,7 +212,7 @@ let private pegNI awaitingPeg pegWorker = pegNI' {| awaitingPeg = awaitingPeg ; 
 let private cannotPegNI' = React.functionComponent ("CannotPegNonInteractive", fun (props:{| awaitingCannotPeg : aval<(unit -> unit) option> |}) ->
     let awaitingCannotPeg = ReactHB.Hooks.useAdaptive props.awaitingCannotPeg
     let cannotPeg () = async {
-        do! Async.Sleep SLEEP
+        do! Async.Sleep 500
         match awaitingCannotPeg with | Some awaitingCannotPeg -> awaitingCannotPeg () | None -> () }
     React.useEffect (cannotPeg >> Async.StartImmediate, [| box awaitingCannotPeg |])
     match awaitingCannotPeg with

@@ -4,9 +4,9 @@ _Work-in-progress towards a cribbage game..._
 
 #### Development prerequisites
 
-- [Microsoft .NET Core 3.1 SDK](https://dotnet.microsoft.com/download/dotnet-core/3.1/): I'm currently using 3.1.302
-- [FAKE 5](https://fake.build/): _dotnet tool install fake-cli --global_; I'm currently using 5.20.2
-- [Paket](https://fsprojects.github.io/Paket/): _dotnet tool install paket --global_; I'm currently using 5.249.0
+- [Microsoft .NET Core 3.1 SDK](https://dotnet.microsoft.com/download/dotnet-core/3.1/): I'm currently using 3.1.401
+- [FAKE 5](https://fake.build/): _dotnet tool install fake-cli --global_; I'm currently using 5.20.3
+- [Paket](https://fsprojects.github.io/Paket/): _dotnet tool install paket --global_; I'm currently using 5.249.2
 - [Yarn](https://yarnpkg.com/lang/en/docs/install/): I'm currently using 1.22.4
 - [Node.js (LTS)](https://nodejs.org/en/download/): I'm currently using 12.18.3
 
@@ -17,6 +17,7 @@ _Work-in-progress towards a cribbage game..._
     - [Ionide-fsharp](https://marketplace.visualstudio.com/items?itemName=ionide.ionide-fsharp)
     - [EditorConfig for VS Code](https://marketplace.visualstudio.com/items?itemName=editorconfig.editorconfig)
     - [Rainbow Brackets](https://marketplace.visualstudio.com/items?itemName=2gua.rainbow-brackets)
+- [Femto](https://github.com/Zaid-Ajaj/Femto): _dotnet tool install femto --global_; I'm currently using 0.8.6
 - [Google Chrome](https://www.google.com/chrome/) with the following extensions:
     - [React Developer Tools](https://chrome.google.com/webstore/detail/react-developer-tools/fmkadmapgofadopljbjfkapdkoienihi/)
     - [Redux DevTools](https://chrome.google.com/webstore/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd/)
