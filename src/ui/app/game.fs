@@ -75,10 +75,13 @@ let private name' = React.memo ("Name", fun (props:{| name : string ; isInteract
         prop.style [ style.display.flex ; style.alignItems.center ; style.justifyContent.center ]
         typography.children [
             Html.strong props.name
-            Mui.icon [
-                if props.isInteractive then icon.color.primary else icon.color.secondary
-                prop.style [ style.verticalAlign.middle ; style.marginLeft (length.em 0.5) ]
-                icon.children [ if props.isInteractive then humanIcon [] else robotIcon [] ] ] ] ])
+            Mui.avatar [
+                avatar.variant.square
+                prop.style [ style.verticalAlign.middle ; style.marginLeft (length.em 0.75) ]
+                avatar.children [
+                    Mui.icon [
+                        if props.isInteractive then icon.color.primary else icon.color.secondary
+                        icon.children [ if props.isInteractive then humanIcon [] else robotIcon [] ] ] ] ] ] ])
 let private name name isInteractive = name' {| name = name ; isInteractive = isInteractive |}
 
 let private forCribI' = React.functionComponent ("ForCribInteractive", fun (props:{| awaitingForCrib : aval<(IsDealer * Hand * (CardS -> unit)) option> |}) ->
@@ -105,7 +108,8 @@ let private forCribNI' = React.functionComponent ("ForCribNonInteractive", fun (
     let runWorker () = async {
         match awaitingForCrib with
         | Some (isDealer, hand, forCrib) when workerStatus <> WorkerStatus.Running && workerStatus <> WorkerStatus.Killed ->
-            do! Async.Sleep 2000
+            do! Async.Sleep 1000
+            //do! Async.Sleep 10000
             worker.exec ((isDealer, hand |> List.ofSeq), Set.ofList >> forCrib)
         | Some _ -> Browser.Dom.console.log "Should never happen: forCribNI' runWorker () when Some awaitingForCrib but worker neither Running nor Killed"
         | None -> () }
@@ -128,12 +132,13 @@ let private forCribNI' = React.functionComponent ("ForCribNonInteractive", fun (
         | _ ->
             // TODO-NMB: Should show "hidden" cards (plus spinner)?...
             Html.div [
-                prop.style [ style.display.flex ; style.justifyContent.center ; style.marginTop (length.em 0.75) ]
+                prop.style [ style.display.flex ; style.justifyContent.center ; style.alignItems.center ; style.marginTop (length.em 0.75) ]
                 prop.children [
-                    Mui.typography [
+                    yield! hand |> List.ofSeq |> List.map Card.render
+                    (* Mui.typography [
                         typography.variant.body1
                         typography.color.textSecondary
-                        typography.children [ Html.text (sprintf "Choosing cards for %s crib from %s..." (if isDealer then "own" else "opponent's") (cardsText hand)) ] ]
+                        typography.children [ Html.text (sprintf "Choosing cards for %s crib from %s..." (if isDealer then "own" else "opponent's") (cardsText hand)) ] ] *)
                     Mui.circularProgress [
                         circularProgress.variant.indeterminate
                         circularProgress.size (length.em 1.5)
@@ -166,7 +171,7 @@ let private pegNI' = React.functionComponent ("PegNonInteractive", fun (props:{|
     let runWorker () = async {
         match awaitingPeg with
         | Some (pegState, peg) when workerStatus <> WorkerStatus.Running && workerStatus <> WorkerStatus.Killed ->
-            do! Async.Sleep (match pegState.Peggable.Count with | 0 -> 500 | 1 -> 1500 | _ -> 3000)
+            do! Async.Sleep (match pegState.Peggable.Count with | 0 -> 500 | 1 -> 1250 | _ -> 2500)
             // Note: option<Card> also problematic - so hack around this.
             worker.exec (toAnon pegState, (fun (isSome, (rank, suit)) -> peg (if isSome then Some (rank, suit) else None)))
         | Some _ -> Browser.Dom.console.log "Should never happen: pegNI' runWorker () when Some awaitingPeg but worker neither Running nor Killed"
@@ -190,15 +195,22 @@ let private pegNI' = React.functionComponent ("PegNonInteractive", fun (props:{|
         | _ ->
             // TODO-NMB: Should show "hidden" card/s (plus spinner)?...
             Html.div [
-                prop.style [ style.display.flex ; style.justifyContent.center ; style.marginTop (length.em 0.75) ]
+                prop.style [ style.display.flex ; style.justifyContent.center ; style.alignItems.center ; style.marginTop (length.em 0.75) ]
                 prop.children [
+                    let all = pegState.Peggable |> Set.union pegState.NotPeggable
+                    if all.Count > 0 then yield! all |> List.ofSeq |> List.map Card.render
                     Mui.typography [
+                        typography.variant.body1
+                        typography.color.textSecondary
+                        prop.style [ style.marginLeft (length.em 0.5) ]
+                        typography.children [ Html.text (sprintf "(running total is %i)" (pips (pegState.Pegged |> List.map fst))) ] ]
+                    (* Mui.typography [
                         typography.variant.body1
                         typography.color.textSecondary
                         typography.children [
                             if pegState.Peggable.Count > 0 then
                                 Html.text (sprintf "Choosing card to peg from %s (running total is %i)..." (cardsText (pegState.Peggable |> Set.union pegState.NotPeggable)) (pips (pegState.Pegged |> List.map fst)))
-                            else Html.text (sprintf "Claiming a go (running total is %i)..." (pips (pegState.Pegged |> List.map fst))) ] ]
+                            else Html.text (sprintf "Claiming a go (running total is %i)..." (pips (pegState.Pegged |> List.map fst))) ] ] *)
                     Mui.circularProgress [
                         circularProgress.variant.indeterminate
                         circularProgress.size (length.em 1.5)
@@ -330,7 +342,7 @@ let private player' = React.memo ("Player", fun (props:{| player : PlayerDetails
             newDealNI props.player.PlayerHooks.AwaitingNewDeal,
             newGameNI props.player.PlayerHooks.AwaitingNewGame
     Mui.card [
-        prop.style [ style.paddingLeft (length.em 0.75) ; style.paddingRight (length.em 0.75) ; style.paddingBottom (length.em 0.75) ]
+        prop.style [ style.minHeight (length.em 16) ; style.paddingLeft (length.em 0.75) ; style.paddingRight (length.em 0.75) ; style.paddingBottom (length.em 0.75) ]
         card.children [
             Mui.grid [
                 grid.container true
@@ -370,7 +382,7 @@ let private game' = React.memo ("Game", fun (props:{| showToast : Toaster.ToastD
         React.fragment [
             player gameDetails.Player1
             // TEMP-NMB...
-            Html.div [ prop.style [ style.height (length.em 9) ] ]
+            Html.div [ prop.style [ style.height (length.em 8) ] ]
             // ...TEMP-NMB
             player gameDetails.Player2
             // TODO-NMB: Statistics?...

@@ -42,7 +42,10 @@ let private buildTheme (appTheme:AppTheme) = Styles.createMuiTheme ([
     theme.palette.secondary'.contrastText appTheme.SecondaryContrastText
     theme.palette.error'.main appTheme.Error
 
-    // TODO-NMB: Overrides?...
+    // TODO-NMB: Add to AppTheme?...
+    theme.overrides.muiAvatar.colorDefault [ if isDarkTheme then style.backgroundColor "#202020" else style.backgroundColor "#dfdfdf" ]
+
+    // TODO-NMB: More overrides?...
 
     (* theme.overrides.muiPaper.elevation2 [
         style.custom ("box-shadow", defaultTheme.shadows.[8])

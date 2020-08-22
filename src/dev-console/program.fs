@@ -38,7 +38,7 @@ let private mainAsync argv = async {
     let mutable retval = 0
 
     try (* TEMP-NMB... *)
-        do! GamePlayer.play GamePlayer.intermediate GamePlayer.random 9999
+        do! GamePlayer.play GamePlayer.neph GamePlayer.jack 1
 
         (* TEMP-NMB...
         Heuristics.run (findSrcDir (DirectoryInfo(Environment.CurrentDirectory))) "intermediate" Aornota.Cribbage.Domain.Strategy.forCribIntermediate 50000 *)

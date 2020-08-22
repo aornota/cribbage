@@ -91,6 +91,7 @@ let pegBasic (pegState:PegState) =
                 | [] -> pegNoneOnlyOrRandom peggable
 
 // Chooses highest-scoring card (adjusted by mean "opponent next card" score).
+// TODO-NMB: Further adjust, e.g. by "self next card" score [unless "opponent next" totals 31]?...
 let pegIntermediate (pegState:PegState) =
     let previouslyPegged, pegged, peggable = pegState.PreviouslyPegged, pegState.Pegged, pegState.Peggable
     match peggable.Count with
