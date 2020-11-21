@@ -1,13 +1,14 @@
 version 5.249.0
 
-framework: auto-detect
+// framework: auto-detect // disabled because of fake/paket issues with 'net50' in paket.lock
 
 group build
 
     source https://api.nuget.org/v3/index.json
+    framework: netstandard2.0
     storage: none
 
-    nuget FSharp.Core
+    nuget FSharp.Core 4.7.0.0
     nuget Fake.Core.Environment
     nuget Fake.Core.Target
     nuget Fake.Core.Trace
@@ -18,10 +19,11 @@ group build
 group consoles
 
     source https://api.nuget.org/v3/index.json
+    framework: netcoreapp3.1
     storage: none
 
 	nuget FSharp.Core
-    nuget FSharp.Data.Adaptive ~> 0.0.25
+    nuget FSharp.Data.Adaptive ~> 0.0.26
     nuget Giraffe.SerilogExtensions
 	nuget Serilog
 	nuget Serilog.Settings.Configuration
@@ -30,6 +32,7 @@ group consoles
 group tests
 
     source https://api.nuget.org/v3/index.json
+    framework: netcoreapp3.1
     storage: none
 
     nuget Expecto
@@ -37,6 +40,7 @@ group tests
 group ui
 
     source https://api.nuget.org/v3/index.json
+    framework: netcoreapp3.1
     storage: none
 
     nuget FSharp.Data.Adaptive ~> 0.0.26
@@ -46,6 +50,6 @@ group ui
 	nuget Fable.MaterialUI.MaterialDesignIcons
     nuget Feliz
     nuget Feliz.MaterialUI
-    nuget Feliz.UseWorker ~> 0.4.2 // pinned because 0.5.0 requires Feliz >= 1.5.0 but no such version exists
+    nuget Feliz.UseWorker
 	nuget Thoth.Elmish.Toast
     // github krauthaufen/Fable.Elmish.Adaptive // using copies of relevant files instead because requires Fable.Promise < 2.1.0 but Feliz.UseWorker requires Fable.Promise >= 2.1.0
