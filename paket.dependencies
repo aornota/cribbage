@@ -1,6 +1,4 @@
-version 5.249.0
-
-// framework: auto-detect // disabled because of fake/paket issues with 'net50' in paket.lock
+version 5.257.0
 
 group build
 
@@ -19,7 +17,7 @@ group build
 group consoles
 
     source https://api.nuget.org/v3/index.json
-    framework: netcoreapp3.1
+    framework: net5.0
     storage: none
 
 	nuget FSharp.Core
@@ -32,7 +30,7 @@ group consoles
 group tests
 
     source https://api.nuget.org/v3/index.json
-    framework: netcoreapp3.1
+    framework: net5.0
     storage: none
 
     nuget Expecto
@@ -40,7 +38,7 @@ group tests
 group ui
 
     source https://api.nuget.org/v3/index.json
-    framework: netcoreapp3.1
+    framework: net5.0
     storage: none
 
     nuget FSharp.Data.Adaptive ~> 0.0.26

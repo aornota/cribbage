@@ -55,8 +55,6 @@ let render = {
         Html.span [
             prop.className "close-button"
             prop.onClick onClick ]
-    member __.InputArea _ = Html.div [ Html.strong "InputArea has not been implemented" ]
-    member __.Input _ _ = Html.div [ Html.strong "Input has not been implemented" ]
     member __.Title title =
         Mui.typography [
             typography.variant.body1
