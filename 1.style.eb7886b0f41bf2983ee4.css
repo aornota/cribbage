@@ -7,7 +7,7 @@
   src:
     local('Roboto Thin '),
     local('Roboto-Thin'),
-    url(c2aa4ab115bf9c6057cb59709d0e152b.woff2) format('woff2'), 
+    url(c2aa4ab115bf9c6057cb59709d0e152b.woff2) format('woff2'), /* Super Modern Browsers */
     url(a45108d3b34af91f9113d827a183296d.woff) format('woff'); /* Modern Browsers */
 }
 
@@ -20,7 +20,7 @@
   src:
     local('Roboto Thin italic'),
     local('Roboto-Thinitalic'),
-    url(7f839a8652da29745ce4260846c3f88e.woff2) format('woff2'), 
+    url(7f839a8652da29745ce4260846c3f88e.woff2) format('woff2'), /* Super Modern Browsers */
     url(451d4e559d6f57cdf6a1c54a3e32e11d.woff) format('woff'); /* Modern Browsers */
 }
 
@@ -33,7 +33,7 @@
   src:
     local('Roboto Light '),
     local('Roboto-Light'),
-    url(37a7069dc30fc663c8781220e5669d25.woff2) format('woff2'), 
+    url(37a7069dc30fc663c8781220e5669d25.woff2) format('woff2'), /* Super Modern Browsers */
     url(865f928cbabcc9f8f2b50fb47a20bc63.woff) format('woff'); /* Modern Browsers */
 }
 
@@ -46,7 +46,7 @@
   src:
     local('Roboto Light italic'),
     local('Roboto-Lightitalic'),
-    url(c64e7e354c88e613c77cab8ac2ebc3ae.woff2) format('woff2'), 
+    url(c64e7e354c88e613c77cab8ac2ebc3ae.woff2) format('woff2'), /* Super Modern Browsers */
     url(bd5b7a13f2c52b531a2a787bf6eb4a13.woff) format('woff'); /* Modern Browsers */
 }
 
@@ -59,7 +59,7 @@
   src:
     local('Roboto Regular '),
     local('Roboto-Regular'),
-    url(176f8f5bd5f02b3abfcf894955d7e919.woff2) format('woff2'), 
+    url(176f8f5bd5f02b3abfcf894955d7e919.woff2) format('woff2'), /* Super Modern Browsers */
     url(49ae34d4cc6b98c00c69ab4c41de3e0c.woff) format('woff'); /* Modern Browsers */
 }
 
@@ -72,7 +72,7 @@
   src:
     local('Roboto Regular italic'),
     local('Roboto-Regularitalic'),
-    url(d022bc70dc1bf7b3425da9cdaa9841b6.woff2) format('woff2'), 
+    url(d022bc70dc1bf7b3425da9cdaa9841b6.woff2) format('woff2'), /* Super Modern Browsers */
     url(b1d9d9904bfca8802a631c45590b9efa.woff) format('woff'); /* Modern Browsers */
 }
 
@@ -85,7 +85,7 @@
   src:
     local('Roboto Medium '),
     local('Roboto-Medium'),
-    url(f5b74d7ffcdf85b9dd60130fa0b2c087.woff2) format('woff2'), 
+    url(f5b74d7ffcdf85b9dd60130fa0b2c087.woff2) format('woff2'), /* Super Modern Browsers */
     url(cea99d3e3e13a3a599a015c29f1046d0.woff) format('woff'); /* Modern Browsers */
 }
 
@@ -98,7 +98,7 @@
   src:
     local('Roboto Medium italic'),
     local('Roboto-Mediumitalic'),
-    url(0d8bb5b3ee5f5dac9e446d48480d28a9.woff2) format('woff2'), 
+    url(0d8bb5b3ee5f5dac9e446d48480d28a9.woff2) format('woff2'), /* Super Modern Browsers */
     url(18d00f739ff1e1c52db1a1c0d9e98129.woff) format('woff'); /* Modern Browsers */
 }
 
@@ -111,7 +111,7 @@
   src:
     local('Roboto Bold '),
     local('Roboto-Bold'),
-    url(c18ee39fb002ad58b6dc595476f88fef.woff2) format('woff2'), 
+    url(c18ee39fb002ad58b6dc595476f88fef.woff2) format('woff2'), /* Super Modern Browsers */
     url(2267169ee7270a22a963b2b2bfb7ab0c.woff) format('woff'); /* Modern Browsers */
 }
 
@@ -124,7 +124,7 @@
   src:
     local('Roboto Bold italic'),
     local('Roboto-Bolditalic'),
-    url(7d8125ff7f707231fd89d9d7109deadf.woff2) format('woff2'), 
+    url(7d8125ff7f707231fd89d9d7109deadf.woff2) format('woff2'), /* Super Modern Browsers */
     url(9360531f9bb817f917f01a6d394515f3.woff) format('woff'); /* Modern Browsers */
 }
 
@@ -137,7 +137,7 @@
   src:
     local('Roboto Black '),
     local('Roboto-Black'),
-    url(870c8c1486f76054301a22c35403eae1.woff2) format('woff2'), 
+    url(870c8c1486f76054301a22c35403eae1.woff2) format('woff2'), /* Super Modern Browsers */
     url(bac8362e7a6ea60b6983ecf09a411a5e.woff) format('woff'); /* Modern Browsers */
 }
 
@@ -150,7 +150,7 @@
   src:
     local('Roboto Black italic'),
     local('Roboto-Blackitalic'),
-    url(cb5ad999740e9d8a8bd1b03b379293a9.woff2) format('woff2'), 
+    url(cb5ad999740e9d8a8bd1b03b379293a9.woff2) format('woff2'), /* Super Modern Browsers */
     url(c20d916c1a1b094c1cec7de61e470633.woff) format('woff'); /* Modern Browsers */
 }
 
