@@ -53,7 +53,7 @@ let cardText (rank:Rank, suit:Suit) = sprintf "%c%c" rank.Text suit.Text
 
 let deckText (deck:Deck) = deck |> List.map cardText |> String.concat " "
 
-let cardsText (cards:CardS) = cards |> List.ofSeq |> List.sort|> List.map cardText |> String.concat " "
+let cardsText (cards:CardS) = cards |> List.ofSeq |> List.sort |> List.map cardText |> String.concat " "
 
 let shuffledDeck () : Deck = unshuffledDeck |> List.ofSeq |> List.zip (randoms unshuffledDeck.Count) |> List.sortBy fst |> List.map snd
 
