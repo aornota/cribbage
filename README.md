@@ -19,7 +19,7 @@ _Work-in-progress towards a cribbage game..._
     - [React Developer Tools](https://chrome.google.com/webstore/detail/react-developer-tools/fmkadmapgofadopljbjfkapdkoienihi/)
     - [Redux DevTools](https://chrome.google.com/webstore/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd/)
 - ([Microsoft .NET Framework 4.7.2 Developer Pack](https://dotnet.microsoft.com/download/dotnet-framework/net472/): this appeared to resolve problems with Intellisense in
-_[build.fsx](https://github.com/aornota/gibet/blob/master/build.fsx)_)
+_[build.fsx](https://github.com/aornota/cribbage/blob/master/build.fsx)_)
 
 #### Running / building
 
